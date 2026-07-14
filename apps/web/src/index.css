@@ -1,0 +1,58 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-ink: #0f172a;
+  --color-brand: #6366f1;
+  --color-brand-2: #ec4899;
+  --font-sans: -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+}
+
+body {
+  @apply bg-[#fafbff] text-ink antialiased;
+  font-family: var(--font-sans);
+}
+
+/* 品牌渐变文字 */
+.text-gradient {
+  @apply bg-gradient-to-r from-indigo-500 via-fuchsia-500 to-pink-500 bg-clip-text text-transparent;
+}
+
+/* uiverse 风格扫光按钮:悬停时高光从左往右掠过 */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.6s ease;
+}
+.btn-shine:hover::after {
+  transform: translateX(120%);
+}
+
+/* uiverse 风格输入框:聚焦时渐变描边发光 */
+.input-glow {
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.input-glow:focus {
+  border-color: transparent;
+  box-shadow:
+    0 0 0 2px #fafbff,
+    0 0 0 4px #6366f1,
+    0 8px 24px -8px rgba(99, 102, 241, 0.5);
+}
+
+/* 背景漂浮色斑 */
+@keyframes blob-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(24px, -28px) scale(1.08); }
+  66% { transform: translate(-18px, 16px) scale(0.94); }
+}
+.blob {
+  @apply absolute rounded-full opacity-25 blur-3xl pointer-events-none;
+  animation: blob-float 14s ease-in-out infinite;
+}

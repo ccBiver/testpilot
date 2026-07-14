@@ -1,0 +1,32 @@
+{
+  "name": "@testpilot/server",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts",
+    "db:push": "prisma db push",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.0.0",
+    "@fastify/rate-limit": "^10.3.0",
+    "@prisma/client": "^6.10.0",
+    "@testpilot/engine": "workspace:*",
+    "@testpilot/executor": "workspace:*",
+    "@testpilot/shared": "workspace:*",
+    "bcryptjs": "^3.0.2",
+    "fastify": "^5.4.0",
+    "jsonwebtoken": "^9.0.2",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^26.1.1",
+    "prisma": "^6.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  }
+}

@@ -1,0 +1,159 @@
+import { motion } from 'framer-motion';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import ConsoleShell from '../components/ConsoleShell';
+import { IconArrowRight, IconBug } from '../components/Icons';
+import { GradientButton, TextInput } from '../components/Ui';
+import { api, ApiError, type ApiProject, type ApiRun } from '../lib/api';
+import { RunStatusBadge } from '../components/RunStatus';
+
+/** 项目详情:发起探索 + 运行历史 */
+export default function ProjectDetail() {
+  const { id = '' } = useParams();
+  const navigate = useNavigate();
+  const [project, setProject] = useState<ApiProject | null>(null);
+  const [runs, setRuns] = useState<ApiRun[]>([]);
+  const [goal, setGoal] = useState('');
+  const [steps, setSteps] = useState('30');
+  const [mode, setMode] = useState<'heuristic' | 'ai'>('heuristic');
+  const [error, setError] = useState('');
+  const [launching, setLaunching] = useState(false);
+
+  const reload = useCallback(() => {
+    api.getProject(id).then(setProject).catch(() => navigate('/console', { replace: true }));
+    api.listRuns(id).then(setRuns).catch(() => {});
+  }, [id, navigate]);
+
+  useEffect(() => {
+    reload();
+    // 有进行中的运行时列表轮询
+    const timer = setInterval(() => {
+      api.listRuns(id).then((rs) => {
+        setRuns(rs);
+      }).catch(() => {});
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [id, reload]);
+
+  const onLaunch = async (e: FormEvent) => {
+    e.preventDefault();
+    setLaunching(true);
+    setError('');
+    try {
+      const run = await api.createRun(id, {
+        mode,
+        goal: goal.trim() || undefined,
+        stepBudget: Number(steps) || 30,
+      });
+      navigate(`/console/runs/${run.id}`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '网络异常,请稍后再试');
+      setLaunching(false);
+    }
+  };
+
+  return (
+    <ConsoleShell>
+      {() => (
+        <div>
+          <Link to="/console" className="text-sm text-slate-400 hover:text-indigo-600">← 我的项目</Link>
+          <div className="mt-2 flex flex-wrap items-baseline gap-3">
+            <h1 className="text-2xl font-black">{project?.name ?? '…'}</h1>
+            <span className="text-sm text-slate-400">{project?.targetUrl}</span>
+          </div>
+
+          {/* 发起探索 */}
+          <motion.form
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            onSubmit={onLaunch}
+            className="mt-6 rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm"
+          >
+            <h2 className="font-bold">发起探索</h2>
+            <div className="mt-4 grid gap-4 sm:grid-cols-[2fr_1fr_1fr_auto]">
+              <TextInput
+                label="探索目标(可选)"
+                placeholder="比如:重点测试注册与下单流程"
+                value={goal}
+                onChange={(e) => setGoal(e.target.value)}
+              />
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-600">步数预算</span>
+                <input
+                  type="number"
+                  min={3}
+                  max={100}
+                  value={steps}
+                  onChange={(e) => setSteps(e.target.value)}
+                  className="input-glow w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm outline-none"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-600">模式</span>
+                <select
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value as 'heuristic' | 'ai')}
+                  className="input-glow w-full cursor-pointer rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm outline-none"
+                >
+                  <option value="heuristic">启发式(免费冒烟)</option>
+                  <option value="ai">AI 探索(需模型)</option>
+                </select>
+              </label>
+              <div className="flex items-end">
+                <GradientButton type="submit" disabled={launching} className="inline-flex items-center gap-1.5 !py-3 text-sm">
+                  {launching ? '排队中…' : <>开测 <IconArrowRight className="h-4 w-4" /></>}
+                </GradientButton>
+              </div>
+            </div>
+            {error && (
+              <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm font-medium text-rose-600">{error}</p>
+            )}
+            <p className="mt-3 text-xs text-slate-400">
+              {mode === 'heuristic'
+                ? '启发式:零成本爬行,会优先点击与目标相关的链接和按钮,但不会填写表单;要完整走注册/下单等流程请用 AI 探索。'
+                : 'AI 探索:多模态模型像真实用户一样操作,可填表单、走完整业务流程;按步数消耗模型费用。'}
+            </p>
+          </motion.form>
+
+          {/* 运行历史 */}
+          <h2 className="mt-8 font-bold">运行历史</h2>
+          {runs.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-400">还没有运行记录,点上面「开测」发起第一次探索。</p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {runs.map((r) => (
+                <Link
+                  key={r.id}
+                  to={`/console/runs/${r.id}`}
+                  className="group flex items-center gap-4 rounded-2xl border border-slate-100 bg-white px-5 py-3.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <RunStatusBadge status={r.status} />
+                  <span className="text-sm font-medium">
+                    {r.mode === 'ai' ? 'AI 探索' : '启发式'}
+                    {r.goal ? ` · ${r.goal}` : ''}
+                  </span>
+                  <span className="ml-auto flex items-center gap-1.5 text-sm">
+                    {r.status === 'done' && (
+                      <>
+                        <IconBug className={`h-4 w-4 ${r.findingsCount ? 'text-rose-500' : 'text-emerald-500'}`} />
+                        <b className={r.findingsCount ? 'text-rose-600' : 'text-emerald-600'}>
+                          {r.findingsCount}
+                        </b>
+                        <span className="text-slate-400">缺陷</span>
+                      </>
+                    )}
+                    {r.status === 'failed' && <span className="text-xs text-rose-500">{r.error}</span>}
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    {new Date(r.createdAt).toLocaleString('zh-CN')}
+                  </span>
+                  <IconArrowRight className="h-4 w-4 text-slate-300 transition-transform group-hover:translate-x-1" />
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </ConsoleShell>
+  );
+}

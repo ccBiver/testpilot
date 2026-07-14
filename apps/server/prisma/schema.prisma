@@ -1,0 +1,65 @@
+// M1 认证切片先用 SQLite 零依赖起步;做到 Run/Finding 存储(需要 Json 字段)时
+// 将 provider 切为 postgresql 并启用 docker-compose 里的 PG。字段保持 PG 兼容。
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  // user | admin(SQLite 无枚举,应用层校验)
+  role         String    @default("user")
+  // active | disabled
+  status       String    @default("active")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  projects     Project[]
+  runs         Run[]
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  // 被测目标,M1 先支持 web url;M2 扩展 android 包
+  targetUrl String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  runs      Run[]
+
+  @@index([userId])
+}
+
+model Run {
+  id         String    @id @default(cuid())
+  projectId  String
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // heuristic | ai
+  mode       String    @default("heuristic")
+  // queued | running | done | failed
+  status     String    @default("queued")
+  goal       String?
+  stepBudget Int       @default(30)
+  error      String?
+  // 完整 RunReport 的 JSON 文本(SQLite 无 Json 类型;整存整取,切 PG 时改 Json 列)
+  reportJson String?
+  // 冗余汇总字段,列表页免解析大 JSON
+  findingsCount Int      @default(0)
+  criticalCount Int      @default(0)
+  stepsTaken    Int      @default(0)
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([projectId])
+  @@index([userId])
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@testpilot/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "testpilot": "src/index.ts"
+  },
+  "scripts": {
+    "explore": "tsx src/index.ts explore",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@testpilot/engine": "workspace:*",
+    "@testpilot/executor": "workspace:*",
+    "commander": "^13.1.0",
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "^5.8.0"
+  }
+}

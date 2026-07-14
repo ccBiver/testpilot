@@ -1,0 +1,152 @@
+{
+  "runId": "demo",
+  "mode": "heuristic",
+  "targetUrl": "http://127.0.0.1:60742/",
+  "goal": "演示:全站冒烟探索",
+  "startedAt": 1784032771020,
+  "finishedAt": 1784032774423,
+  "stepBudget": 15,
+  "stepsTaken": 7,
+  "visitedUrls": [
+    "http://127.0.0.1:60742/",
+    "http://127.0.0.1:60742/about",
+    "http://127.0.0.1:60742/products",
+    "http://127.0.0.1:60742/broken-page"
+  ],
+  "steps": [
+    {
+      "seq": 1,
+      "description": "打开目标页面 http://127.0.0.1:60742/",
+      "pageUrl": "http://127.0.0.1:60742/",
+      "pageTitle": "演示商城",
+      "screenshotFile": "screenshots/step-001.png",
+      "at": 1784032772081
+    },
+    {
+      "seq": 2,
+      "description": "打开链接「关于我们」(http://127.0.0.1:60742/about)",
+      "pageUrl": "http://127.0.0.1:60742/about",
+      "pageTitle": "关于我们",
+      "screenshotFile": "screenshots/step-002.png",
+      "at": 1784032772660
+    },
+    {
+      "seq": 3,
+      "description": "打开链接「产品列表」(http://127.0.0.1:60742/products)",
+      "pageUrl": "http://127.0.0.1:60742/products",
+      "pageTitle": "产品列表",
+      "screenshotFile": "screenshots/step-003.png",
+      "at": 1784032773241
+    },
+    {
+      "seq": 4,
+      "description": "打开链接「帮助中心」(http://127.0.0.1:60742/broken-page)",
+      "pageUrl": "http://127.0.0.1:60742/broken-page",
+      "pageTitle": "404",
+      "screenshotFile": "screenshots/step-004.png",
+      "at": 1784032773780
+    },
+    {
+      "seq": 5,
+      "description": "返回起始页(http://127.0.0.1:60742/)",
+      "pageUrl": "http://127.0.0.1:60742/",
+      "pageTitle": "演示商城",
+      "screenshotFile": "screenshots/step-005.png",
+      "at": 1784032774315
+    },
+    {
+      "seq": 6,
+      "description": "点击按钮「加入购物车」",
+      "pageUrl": "http://127.0.0.1:60742/",
+      "pageTitle": "演示商城",
+      "screenshotFile": "screenshots/step-006.png",
+      "at": 1784032774388
+    },
+    {
+      "seq": 7,
+      "description": "点击按钮「查看推荐」",
+      "pageUrl": "http://127.0.0.1:60742/",
+      "pageTitle": "演示商城",
+      "screenshotFile": "screenshots/step-007.png",
+      "at": 1784032774422
+    }
+  ],
+  "findings": [
+    {
+      "detector": "network-failure",
+      "severity": "high",
+      "title": "接口/资源异常:HTTP 500 GET http://127.0.0.1:60742/api/products",
+      "fingerprint": "network-failure:a178d6cf",
+      "pageUrl": "http://127.0.0.1:60742/products",
+      "evidence": {
+        "method": "GET",
+        "requestUrl": "http://127.0.0.1:60742/api/products",
+        "status": 500
+      },
+      "id": "f-1",
+      "stepSeq": 3,
+      "screenshotFile": "screenshots/step-003.png",
+      "at": 1784032773241
+    },
+    {
+      "detector": "console-error",
+      "severity": "high",
+      "title": "控制台错误:加载产品失败: HTTP 500",
+      "fingerprint": "console-error:6ecf63fa",
+      "pageUrl": "http://127.0.0.1:60742/products",
+      "evidence": {
+        "message": "加载产品失败: HTTP 500"
+      },
+      "id": "f-2",
+      "stepSeq": 3,
+      "screenshotFile": "screenshots/step-003.png",
+      "at": 1784032773242
+    },
+    {
+      "detector": "network-failure",
+      "severity": "medium",
+      "title": "接口/资源异常:HTTP 404 GET http://127.0.0.1:60742/broken-page",
+      "fingerprint": "network-failure:9e0b22dd",
+      "pageUrl": "http://127.0.0.1:60742/products",
+      "evidence": {
+        "method": "GET",
+        "requestUrl": "http://127.0.0.1:60742/broken-page",
+        "status": 404
+      },
+      "id": "f-3",
+      "stepSeq": 4,
+      "screenshotFile": "screenshots/step-004.png",
+      "at": 1784032773780
+    },
+    {
+      "detector": "console-error",
+      "severity": "high",
+      "title": "控制台错误:TypeError: cart is undefined at cart.js:42",
+      "fingerprint": "console-error:2765d9c1",
+      "pageUrl": "http://127.0.0.1:60742/",
+      "evidence": {
+        "message": "TypeError: cart is undefined at cart.js:42"
+      },
+      "id": "f-4",
+      "stepSeq": 6,
+      "screenshotFile": "screenshots/step-006.png",
+      "at": 1784032774388
+    },
+    {
+      "detector": "network-failure",
+      "severity": "high",
+      "title": "接口/资源异常:HTTP 500 GET http://127.0.0.1:60742/api/recommend",
+      "fingerprint": "network-failure:0efa04b3",
+      "pageUrl": "http://127.0.0.1:60742/",
+      "evidence": {
+        "method": "GET",
+        "requestUrl": "http://127.0.0.1:60742/api/recommend",
+        "status": 500
+      },
+      "id": "f-5",
+      "stepSeq": 7,
+      "screenshotFile": "screenshots/step-007.png",
+      "at": 1784032774422
+    }
+  ]
+}
