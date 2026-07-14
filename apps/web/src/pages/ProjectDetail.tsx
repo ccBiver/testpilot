@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import ConsoleShell from '../components/ConsoleShell';
 import { IconArrowRight, IconBug } from '../components/Icons';
 import IssueBoard from '../components/IssueBoard';
-import { GradientButton, TextInput } from '../components/Ui';
+import { BackLink, GradientButton, TextInput } from '../components/Ui';
 import { api, ApiError, type ApiProject, type ApiRun } from '../lib/api';
 import { RunStatusBadge } from '../components/RunStatus';
 
@@ -58,7 +58,7 @@ export default function ProjectDetail() {
     <ConsoleShell>
       {() => (
         <div>
-          <Link to="/console" className="text-sm text-slate-400 hover:text-indigo-600">← 我的项目</Link>
+          <BackLink to="/console">我的项目</BackLink>
           <div className="mt-2 flex flex-wrap items-baseline gap-3">
             <h1 className="text-2xl font-black">{project?.name ?? '…'}</h1>
             <span className="text-sm text-slate-400">{project?.targetUrl}</span>

@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion';
-import { Link } from 'react-router-dom';
 import { IconRocket } from '../components/Icons';
-import { GhostButton } from '../components/Ui';
+import { BackLink } from '../components/Ui';
 
 /** 控制台/后台占位页,M1 实现 */
 export default function Placeholder({ title }: { title: string }) {
@@ -20,7 +19,7 @@ export default function Placeholder({ title }: { title: string }) {
       <p className="max-w-sm text-slate-500">
         M1 里这里会出现项目管理、测试任务与 Bug 看板。当前可以先用 CLI 发起探索测试。
       </p>
-      <Link to="/"><GhostButton>← 回到首页</GhostButton></Link>
+      <BackLink to="/">回到首页</BackLink>
     </div>
   );
 }

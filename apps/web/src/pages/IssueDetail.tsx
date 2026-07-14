@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import ConsoleShell from '../components/ConsoleShell';
 import { ISSUE_STATUS_META, SEVERITY_META } from '../components/IssueBoard';
+import { BackLink } from '../components/Ui';
 import { api, type ApiIssue, type ApiStep, type IssueStatus } from '../lib/api';
 
 /** 缺陷详情:证据、截图、复现步骤、状态流转 */
@@ -60,9 +61,7 @@ export default function IssueDetail() {
     <ConsoleShell>
       {() => (
         <div>
-          <Link to={`/console/projects/${issue.projectId}`} className="text-sm text-slate-400 hover:text-indigo-600">
-            ← 返回看板
-          </Link>
+          <BackLink to={`/console/projects/${issue.projectId}`}>返回看板</BackLink>
 
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             <div className="mt-2 flex flex-wrap items-center gap-3">

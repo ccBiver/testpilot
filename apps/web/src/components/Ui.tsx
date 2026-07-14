@@ -1,4 +1,6 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { IconArrowLeft } from './Icons';
 
 /** 主按钮:渐变底 + uiverse 风格悬停扫光 + 按压回弹 */
 export function GradientButton({
@@ -46,6 +48,19 @@ export function TextInput({
         className={`input-glow w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm outline-none placeholder:text-slate-300 ${className}`}
       />
     </label>
+  );
+}
+
+/** 返回链接:胶囊样式,悬停时箭头左滑 + 轻微上浮 */
+export function BackLink({ to, children }: { to: string; children: ReactNode }) {
+  return (
+    <Link
+      to={to}
+      className="group inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white py-1.5 pl-3 pr-4 text-xs font-semibold text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:border-indigo-200 hover:text-indigo-600 hover:shadow-md active:translate-y-0"
+    >
+      <IconArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+      {children}
+    </Link>
   );
 }
 

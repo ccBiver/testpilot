@@ -128,6 +128,15 @@ export function IconChevronRight(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function IconArrowLeft(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="m12 19-7-7 7-7" />
+      <path d="M19 12H5" />
+    </Icon>
+  );
+}
+
 /** 品牌 Logo:渐变圆角块 + 卫星图标 + 字标 */
 export function Logo({ size = 'md' }: { size?: 'md' | 'lg' }) {
   const box = size === 'lg' ? 'h-9 w-9 rounded-xl' : 'h-8 w-8 rounded-lg';

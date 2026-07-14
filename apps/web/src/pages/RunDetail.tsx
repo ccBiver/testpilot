@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import ConsoleShell from '../components/ConsoleShell';
 import { IconBug, IconChevronRight } from '../components/Icons';
 import { RunStatusBadge, SEVERITY_LABELS } from '../components/RunStatus';
+import { BackLink } from '../components/Ui';
 import { api, type ApiFinding, type ApiRun } from '../lib/api';
 
 /** 需要鉴权的截图:fetch → blob URL */
@@ -100,11 +101,7 @@ export default function RunDetail() {
     <ConsoleShell>
       {() => (
         <div>
-          {run && (
-            <Link to={`/console/projects/${run.projectId}`} className="text-sm text-slate-400 hover:text-indigo-600">
-              ← 返回项目
-            </Link>
-          )}
+          {run && <BackLink to={`/console/projects/${run.projectId}`}>返回项目</BackLink>}
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-black">运行详情</h1>
             {run && <RunStatusBadge status={run.status} />}
