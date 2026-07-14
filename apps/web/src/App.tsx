@@ -4,6 +4,7 @@ import Auth from './pages/Auth';
 import Console from './pages/Console';
 import ProjectDetail from './pages/ProjectDetail';
 import RunDetail from './pages/RunDetail';
+import IssueDetail from './pages/IssueDetail';
 import Placeholder from './pages/Placeholder';
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
       <Route path="/console" element={<Console />} />
       <Route path="/console/projects/:id" element={<ProjectDetail />} />
       <Route path="/console/runs/:id" element={<RunDetail />} />
+      <Route path="/console/issues/:id" element={<IssueDetail />} />
       <Route path="/admin" element={<Placeholder title="管理后台" />} />
     </Routes>
   );

@@ -21,6 +21,7 @@ model User {
   updatedAt    DateTime  @updatedAt
   projects     Project[]
   runs         Run[]
+  issues       Issue[]
 }
 
 model Project {
@@ -33,7 +34,37 @@ model Project {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   runs      Run[]
+  issues    Issue[]
 
+  @@index([userId])
+}
+
+// 看板上的 Bug:跨运行按指纹聚合后的实体;Finding 是每次运行的原始发现(不可变,存于 Run.reportJson)
+model Issue {
+  id          String  @id @default(cuid())
+  projectId   String
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fingerprint String
+  detector    String
+  // critical | high | medium | low(取历次出现的最高级别)
+  severity    String
+  title       String
+  // open(待确认) | confirmed(已确认) | fixing(修复中) | closed(已关闭) | false_positive(误报)
+  status      String  @default("open")
+  occurrences Int     @default(1)
+  // 最近一次命中的 Finding 快照 JSON(证据/截图/stepSeq),配合 lastRunId 查复现步骤
+  findingJson String
+  firstRunId  String
+  lastRunId   String
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([projectId, fingerprint])
+  @@index([projectId, status])
   @@index([userId])
 }
 

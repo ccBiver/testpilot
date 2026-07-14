@@ -140,6 +140,24 @@ export interface ApiRun {
   report: ApiRunReport | null;
 }
 
+export type IssueStatus = 'open' | 'confirmed' | 'fixing' | 'closed' | 'false_positive';
+
+export interface ApiIssue {
+  id: string;
+  projectId: string;
+  fingerprint: string;
+  detector: string;
+  severity: ApiFinding['severity'];
+  title: string;
+  status: IssueStatus;
+  occurrences: number;
+  firstRunId: string;
+  lastRunId: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  finding: ApiFinding | null;
+}
+
 export const api = {
   async register(email: string, password: string): Promise<ApiUser> {
     const data = await request<AuthResult>('/api/auth/register', {
@@ -195,6 +213,24 @@ export const api = {
     }).then((d) => d.run),
 
   getRun: (id: string) => request<{ run: ApiRun }>(`/api/runs/${id}`).then((d) => d.run),
+
+  listIssues: (projectId: string, filters: { status?: string; severity?: string } = {}) => {
+    const params = new URLSearchParams(
+      Object.entries(filters).filter(([, v]) => Boolean(v)) as [string, string][],
+    );
+    const suffix = params.size ? `?${params}` : '';
+    return request<{ issues: ApiIssue[] }>(`/api/projects/${projectId}/issues${suffix}`).then(
+      (d) => d.issues,
+    );
+  },
+
+  getIssue: (id: string) => request<{ issue: ApiIssue }>(`/api/issues/${id}`).then((d) => d.issue),
+
+  updateIssueStatus: (id: string, status: IssueStatus) =>
+    request<{ issue: ApiIssue }>(`/api/issues/${id}`, {
+      method: 'PATCH',
+      body: { status },
+    }).then((d) => d.issue),
 
   /** 截图需带鉴权,取回 blob URL(调用方负责 revoke) */
   async fetchArtifact(runId: string, screenshotFile: string): Promise<string> {

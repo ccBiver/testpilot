@@ -3,16 +3,18 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import ConsoleShell from '../components/ConsoleShell';
 import { IconArrowRight, IconBug } from '../components/Icons';
+import IssueBoard from '../components/IssueBoard';
 import { GradientButton, TextInput } from '../components/Ui';
 import { api, ApiError, type ApiProject, type ApiRun } from '../lib/api';
 import { RunStatusBadge } from '../components/RunStatus';
 
-/** 项目详情:发起探索 + 运行历史 */
+/** 项目详情:发起探索 + 运行历史 / Bug 看板 */
 export default function ProjectDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const [project, setProject] = useState<ApiProject | null>(null);
   const [runs, setRuns] = useState<ApiRun[]>([]);
+  const [tab, setTab] = useState<'runs' | 'issues'>('runs');
   const [goal, setGoal] = useState('');
   const [steps, setSteps] = useState('30');
   const [mode, setMode] = useState<'heuristic' | 'ai'>('heuristic');
@@ -115,9 +117,35 @@ export default function ProjectDetail() {
             </p>
           </motion.form>
 
-          {/* 运行历史 */}
-          <h2 className="mt-8 font-bold">运行历史</h2>
-          {runs.length === 0 ? (
+          {/* 标签页:运行历史 / Bug 看板 */}
+          <div className="mt-8 flex gap-1 border-b border-slate-200">
+            {(
+              [
+                { key: 'runs', label: '运行历史' },
+                { key: 'issues', label: 'Bug 看板' },
+              ] as const
+            ).map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`relative cursor-pointer px-4 py-2.5 text-sm font-bold transition-colors ${
+                  tab === t.key ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'
+                }`}
+              >
+                {t.label}
+                {tab === t.key && (
+                  <motion.span
+                    layoutId="tab-underline"
+                    className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-gradient-to-r from-indigo-500 to-pink-500"
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {tab === 'issues' ? (
+            <div className="mt-5"><IssueBoard projectId={id} /></div>
+          ) : runs.length === 0 ? (
             <p className="mt-4 text-sm text-slate-400">还没有运行记录,点上面「开测」发起第一次探索。</p>
           ) : (
             <div className="mt-3 space-y-2">
