@@ -2,10 +2,22 @@ import { motion } from 'framer-motion';
 import { IconRocket } from '../components/Icons';
 import { BackLink } from '../components/Ui';
 
-/** 控制台/后台占位页,M1 实现 */
-export default function Placeholder({ title }: { title: string }) {
+interface PlaceholderProps {
+  title: string;
+  /** 说明文案,按页面定制 */
+  hint?: string;
+  /** 内嵌在控制台外壳里(不占满屏、不显示返回首页) */
+  embedded?: boolean;
+}
+
+/** 功能占位页 */
+export default function Placeholder({ title, hint, embedded = false }: PlaceholderProps) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-4 text-center">
+    <div
+      className={`flex flex-col items-center justify-center gap-6 px-4 text-center ${
+        embedded ? 'py-24' : 'min-h-screen'
+      }`}
+    >
       <motion.span
         className="inline-flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-indigo-500 to-pink-500 text-white shadow-xl shadow-indigo-300/50"
         animate={{ y: [0, -14, 0], rotate: [0, 6, 0] }}
@@ -17,9 +29,9 @@ export default function Placeholder({ title }: { title: string }) {
         {title} <span className="text-gradient">建设中</span>
       </h1>
       <p className="max-w-sm text-slate-500">
-        M1 里这里会出现项目管理、测试任务与 Bug 看板。当前可以先用 CLI 发起探索测试。
+        {hint ?? '这个板块正在路上,敬请期待。'}
       </p>
-      <BackLink to="/">回到首页</BackLink>
+      {!embedded && <BackLink to="/">回到首页</BackLink>}
     </div>
   );
 }
