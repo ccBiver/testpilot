@@ -158,6 +158,14 @@ export interface ApiIssue {
   finding: ApiFinding | null;
 }
 
+export interface ApiModelConfig {
+  baseUrl: string;
+  modelName: string;
+  vlMode: 'none' | 'qwen';
+  apiKeyMasked: string;
+  updatedAt: string;
+}
+
 export const api = {
   async register(email: string, password: string): Promise<ApiUser> {
     const data = await request<AuthResult>('/api/auth/register', {
@@ -231,6 +239,17 @@ export const api = {
       method: 'PATCH',
       body: { status },
     }).then((d) => d.issue),
+
+  getModelConfig: () =>
+    request<{ config: ApiModelConfig | null }>('/api/settings/model').then((d) => d.config),
+
+  saveModelConfig: (input: { apiKey?: string; baseUrl: string; modelName: string; vlMode: string }) =>
+    request<{ config: ApiModelConfig }>('/api/settings/model', { method: 'PUT', body: input }).then(
+      (d) => d.config,
+    ),
+
+  clearModelConfig: () =>
+    request<{ deleted: boolean }>('/api/settings/model', { method: 'DELETE' }),
 
   /** 截图需带鉴权,取回 blob URL(调用方负责 revoke) */
   async fetchArtifact(runId: string, screenshotFile: string): Promise<string> {

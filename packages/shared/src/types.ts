@@ -1,6 +1,16 @@
 /** 缺陷严重级别 */
 export type Severity = 'critical' | 'high' | 'medium' | 'low';
 
+/** 多模态模型配置(BYOK):AI 探索模式的供能来源 */
+export interface ModelConfig {
+  apiKey: string;
+  /** OpenAI 兼容接口地址,如 https://dashscope.aliyuncs.com/compatible-mode/v1 */
+  baseUrl: string;
+  modelName: string;
+  /** qwen = Qwen-VL 坐标兼容模式(DashScope 需开启);none = 通用 */
+  vlMode: 'none' | 'qwen';
+}
+
 /** 探索/执行过程中采集到的原始信号 */
 export type Signal =
   | {

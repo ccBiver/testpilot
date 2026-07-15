@@ -1,16 +1,21 @@
+import type { ModelConfig } from '@testpilot/shared';
 import { checkGuardrail, type WebExecutor } from '@testpilot/executor';
 import type { Brain, BrainContext, StepPlan } from './types.js';
 
 /**
  * AI 大脑:基于 Midscene 视觉驱动探索。
- * 每步让多模态模型规划一个「像真实用户」的操作;需配置模型环境变量(见 .env.example)。
+ * 模型来源二选一:显式传入 ModelConfig(平台 BYOK,按用户注入),
+ * 或进程环境变量(CLI 本地用法,见 .env.example)。
  */
 export class AiBrain implements Brain {
   readonly name = 'ai';
   private agent: MidsceneAgent | null = null;
   private readonly actionHistory: string[] = [];
 
-  constructor(private readonly executor: WebExecutor) {}
+  constructor(
+    private readonly executor: WebExecutor,
+    private readonly modelConfig?: ModelConfig,
+  ) {}
 
   async nextStep(obs: Parameters<Brain['nextStep']>[0], ctx: BrainContext): Promise<StepPlan | null> {
     const agent = await this.ensureAgent();
@@ -44,15 +49,26 @@ export class AiBrain implements Brain {
 
   private async ensureAgent(): Promise<MidsceneAgent> {
     if (this.agent) return this.agent;
-    if (!process.env.OPENAI_API_KEY && !process.env.MIDSCENE_MODEL_NAME) {
-      throw new Error('AI 模式需要配置模型环境变量(参考 .env.example),或改用 --mode heuristic');
+    if (!this.modelConfig && !process.env.OPENAI_API_KEY && !process.env.MIDSCENE_MODEL_NAME) {
+      throw new Error('AI 模式需要配置模型:平台端在「设置」里填写模型 Key,CLI 则配置环境变量');
     }
-    const mod = (await import('@midscene/web/playwright')) as {
-      PlaywrightAgent: new (page: unknown) => MidsceneAgent;
-    };
+    const mod = (await import('@midscene/web/playwright')) as unknown as MidsceneModule;
+    if (this.modelConfig) {
+      mod.overrideAIConfig({
+        OPENAI_API_KEY: this.modelConfig.apiKey,
+        OPENAI_BASE_URL: this.modelConfig.baseUrl,
+        MIDSCENE_MODEL_NAME: this.modelConfig.modelName,
+        ...(this.modelConfig.vlMode === 'qwen' ? { MIDSCENE_USE_QWEN_VL: '1' } : {}),
+      });
+    }
     this.agent = new mod.PlaywrightAgent(this.executor.page);
     return this.agent;
   }
+}
+
+interface MidsceneModule {
+  PlaywrightAgent: new (page: unknown) => MidsceneAgent;
+  overrideAIConfig: (config: Record<string, string>) => void;
 }
 
 interface MidsceneAgent {

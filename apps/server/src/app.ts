@@ -10,6 +10,7 @@ import { makeRequireAuth, registerAuthRoutes } from './auth/routes.js';
 import { registerProjectRoutes } from './projects/routes.js';
 import { registerRunRoutes } from './runs/routes.js';
 import { registerIssueRoutes } from './issues/routes.js';
+import { registerSettingsRoutes } from './settings/routes.js';
 import { RunQueue } from './runs/runner.js';
 
 /** 组装 Fastify 应用(与监听分离,测试用 app.inject 直连) */
@@ -44,10 +45,11 @@ export async function buildApp(config: ServerConfig, prisma: PrismaClient): Prom
   registerAuthRoutes(app, auth);
 
   const requireAuth = makeRequireAuth(auth);
-  const queue = new RunQueue(prisma, config.artifactsRoot ?? path.resolve('data/artifacts'));
+  const queue = new RunQueue(prisma, config.artifactsRoot ?? path.resolve('data/artifacts'), config.jwtSecret);
   registerProjectRoutes(app, prisma, requireAuth);
   registerRunRoutes(app, prisma, queue, requireAuth);
   registerIssueRoutes(app, prisma, requireAuth);
+  registerSettingsRoutes(app, prisma, config, requireAuth);
 
   return app;
 }

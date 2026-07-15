@@ -6,6 +6,7 @@ import Console from './pages/Console';
 import ProjectDetail from './pages/ProjectDetail';
 import RunDetail from './pages/RunDetail';
 import IssueDetail from './pages/IssueDetail';
+import Settings from './pages/Settings';
 import Placeholder from './pages/Placeholder';
 
 export default function App() {
@@ -18,14 +19,7 @@ export default function App() {
       <Route path="/console/projects/:id" element={<ProjectDetail />} />
       <Route path="/console/runs/:id" element={<RunDetail />} />
       <Route path="/console/issues/:id" element={<IssueDetail />} />
-      <Route
-        path="/console/settings"
-        element={
-          <ConsoleShell>
-            {() => <Placeholder title="设置" hint="模型 API Key 配置(BYOK)与账号设置即将上线。" embedded />}
-          </ConsoleShell>
-        }
-      />
+      <Route path="/console/settings" element={<Settings />} />
       <Route
         path="/admin"
         element={
