@@ -1,5 +1,4 @@
-#!/usr/bin/env tsx
-// CLI 入口:testpilot explore <url>
+// CLI 入口:testpilot explore <url> | testpilot runner --token(shebang 由 tsup banner 注入)
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Command } from 'commander';
@@ -21,6 +20,8 @@ program
   .option('--headed', '显示浏览器窗口', false)
   .option('-o, --out <dir>', '输出目录,默认 runs/<时间戳>')
   .action(async (url: string, opts) => {
+    const { ensureChromium } = await import('./ensure-browser.js');
+    ensureChromium();
     const mode = opts.mode === 'ai' ? 'ai' : opts.mode === 'cli' ? 'cli' : 'heuristic';
     const outDir = path.resolve(
       opts.out ?? path.join('runs', new Date().toISOString().replace(/[:.]/g, '-')),
@@ -61,6 +62,8 @@ program
   .option('--server <url>', '平台地址', 'http://localhost:3100')
   .option('--headed', '显示浏览器窗口,围观 AI 操作(默认后台无头执行)', false)
   .action(async (opts) => {
+    const { ensureChromium } = await import('./ensure-browser.js');
+    ensureChromium();
     const { Runner } = await import('./runner.js');
     const runner = new Runner({ serverUrl: opts.server, token: opts.token, headed: opts.headed });
     process.on('SIGINT', () => {

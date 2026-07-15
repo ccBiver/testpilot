@@ -46,6 +46,8 @@
 - [x] 自托管 Runner 通道:Runner Token(sha256)、claim 原子抢占协议、结果/截图回传、
       testpilot runner 命令、设置页 Token 管理、发起表单执行位置选择;
       可用本机 CLI 订阅并测内网站点,实测演示站全链路通(2026-07-15)
+- [x] CLI 独立打包:tsup 内联 workspace 包,重命名 testpilot-cli,首启自动装 Chromium,
+      tarball 干净目录安装实测领单执行回传成功;npm publish 待定包名/账号后一键执行(2026-07-16)
 - [ ] 运行中 WebSocket 进度推送
 - [ ] 验收:新用户从宣传页注册 → 建项目 → 发起探索 → 看板出现 Bug → 标记误报/确认;
       admin 在后台能看到该用户与运行记录并可禁用

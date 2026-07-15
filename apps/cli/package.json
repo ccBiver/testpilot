@@ -1,23 +1,33 @@
 {
-  "name": "@testpilot/cli",
+  "name": "testpilot-cli",
   "version": "0.1.0",
+  "description": "TestPilot CLI:AI 自主探索测试 + 自托管 Runner。npx testpilot-cli runner --token tpr_xxx 即可为平台接单。",
   "type": "module",
+  "license": "MIT",
   "bin": {
-    "testpilot": "src/index.ts"
+    "testpilot": "dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "explore": "tsx src/index.ts explore",
+    "build": "tsup",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@midscene/web": "^0.30.0",
+    "@playwright/test": "^1.61.1",
+    "commander": "^13.1.0",
+    "playwright": "^1.53.0"
+  },
+  "devDependencies": {
     "@testpilot/engine": "workspace:*",
     "@testpilot/executor": "workspace:*",
     "@testpilot/shared": "workspace:*",
-    "commander": "^13.1.0",
-    "tsx": "^4.19.0"
-  },
-  "devDependencies": {
     "@types/node": "^26.1.1",
+    "tsup": "^8.5.0",
+    "tsx": "^4.19.0",
     "typescript": "^5.8.0"
   }
 }

@@ -10,7 +10,7 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "explore": "pnpm --filter @testpilot/cli explore",
+    "explore": "pnpm --filter testpilot-cli explore",
     "web:dev": "pnpm --filter @testpilot/web dev"
   },
   "devDependencies": {

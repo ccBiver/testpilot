@@ -41,8 +41,9 @@ export default function RunnerTokenSection() {
     await reload();
   };
 
+  // 发布到 npm 后改为:npx testpilot-cli runner --token <token> --server <平台地址>
   const copyCommand = freshToken
-    ? `pnpm --filter @testpilot/cli exec tsx src/index.ts runner --token ${freshToken}`
+    ? `pnpm --filter testpilot-cli exec tsx src/index.ts runner --token ${freshToken}`
     : '';
 
   return (
