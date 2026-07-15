@@ -59,9 +59,10 @@ program
   .description('启动自托管 Runner:领取平台任务在本机执行(可用本机 claude 订阅与内网)')
   .requiredOption('-t, --token <token>', 'Runner Token(控制台「设置」页创建,tpr_ 开头)')
   .option('--server <url>', '平台地址', 'http://localhost:3100')
+  .option('--headed', '显示浏览器窗口,围观 AI 操作(默认后台无头执行)', false)
   .action(async (opts) => {
     const { Runner } = await import('./runner.js');
-    const runner = new Runner({ serverUrl: opts.server, token: opts.token });
+    const runner = new Runner({ serverUrl: opts.server, token: opts.token, headed: opts.headed });
     process.on('SIGINT', () => {
       console.log('\n👋 Runner 退出');
       runner.stop();

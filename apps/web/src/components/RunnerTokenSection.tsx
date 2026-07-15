@@ -56,6 +56,7 @@ export default function RunnerTokenSection() {
       <p className="mt-1 text-xs leading-relaxed text-slate-400">
         在你自己的电脑上执行测试任务:可使用本机的 Claude Code 订阅(CLI 模式免 API Key),
         还能测试内网/localhost 站点。创建 Token 后在本机运行 runner 命令即可接单。
+        默认后台无头执行,不弹任何窗口;想围观 AI 操作过程,启动命令加 --headed。
       </p>
 
       <form onSubmit={onCreate} className="mt-4 flex items-end gap-3">

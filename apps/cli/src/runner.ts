@@ -17,6 +17,8 @@ interface ClaimedRun {
 export interface RunnerOptions {
   serverUrl: string;
   token: string;
+  /** 显示浏览器窗口(围观 AI 操作/调试用),默认无头不可见 */
+  headed?: boolean;
   /** 空闲轮询间隔 ms */
   pollInterval?: number;
   log?: (message: string) => void;
@@ -81,7 +83,7 @@ export class Runner {
   private async execute(run: ClaimedRun): Promise<void> {
     this.log(`▶ 领取任务 ${run.id}:${run.targetUrl}(模式 ${run.mode},${run.stepBudget} 步)`);
     const outDir = await mkdtemp(path.join(os.tmpdir(), `testpilot-runner-${run.id}-`));
-    const executor = new WebExecutor();
+    const executor = new WebExecutor({ headless: !this.opts.headed });
     try {
       const explorer = new Explorer(executor, this.brainFor(run, executor), {
         targetUrl: run.targetUrl,
