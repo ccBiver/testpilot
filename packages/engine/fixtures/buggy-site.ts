@@ -10,7 +10,7 @@ import type { AddressInfo } from 'node:net';
 const page = (title: string, body: string) => `<!doctype html>
 <html><head><meta charset="utf-8"><title>${title}</title>
 <style>nav{position:fixed;top:0;left:0;right:0;background:#fff;padding:8px}main{padding-top:48px}</style></head>
-<body><nav><a href="/">首页</a> <a href="/about">关于我们</a> <a href="/products">产品列表</a> <a href="/broken-page">帮助中心</a></nav>
+<body><nav><a href="/">首页</a> <a href="/about">关于我们</a> <a href="/products">产品列表</a> <a href="/register">注册</a> <a href="/broken-page">帮助中心</a></nav>
 <main><h1>${title}</h1>${body}</main></body></html>`;
 
 const routes: Record<string, (res: http.ServerResponse) => void> = {
@@ -36,6 +36,24 @@ const routes: Record<string, (res: http.ServerResponse) => void> = {
         '产品列表',
         `<script>fetch('/api/products').then(r => { if (!r.ok) console.error('加载产品失败: HTTP ' + r.status) })</script>
          <p>产品加载中……</p>`,
+      ),
+    );
+  },
+  '/register': (res) => {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end(
+      page(
+        '注册',
+        `<form onsubmit="event.preventDefault();
+           const email = document.getElementById('email').value;
+           const pw = document.getElementById('pw').value;
+           document.getElementById('result').textContent =
+             email && pw.length >= 8 ? '注册成功:' + email : '注册失败:请检查输入';">
+           <label for="email">邮箱</label><input id="email" type="email" placeholder="you@example.com">
+           <label for="pw">密码</label><input id="pw" type="password" placeholder="至少 8 位">
+           <button type="submit">提交注册</button>
+         </form>
+         <p id="result"></p>`,
       ),
     );
   },

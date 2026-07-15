@@ -126,7 +126,7 @@ export interface ApiRunReport {
 export interface ApiRun {
   id: string;
   projectId: string;
-  mode: 'heuristic' | 'ai';
+  mode: 'heuristic' | 'ai' | 'cli';
   status: 'queued' | 'running' | 'done' | 'failed';
   goal: string | null;
   stepBudget: number;

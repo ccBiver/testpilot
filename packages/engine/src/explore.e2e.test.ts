@@ -78,6 +78,27 @@ describe('端到端:启发式探索带 Bug 的演示站点', () => {
     expect(persisted.targetUrl).toBe(site.url);
   });
 
+  it('执行器表单能力:observe 列出输入框,fillInput+点击提交完成注册', async () => {
+    const executor = new WebExecutor();
+    try {
+      await executor.launch(new URL('/register', site.url).href);
+      const obs = await executor.observe();
+
+      const inputs = obs.interactables.filter((i) => i.kind === 'input');
+      expect(inputs.map((i) => i.kind === 'input' && i.label)).toEqual(['邮箱', '密码']);
+      expect(inputs.map((i) => i.kind === 'input' && i.inputType)).toEqual(['email', 'password']);
+
+      await executor.fillInput(0, 'tp-test@example.com');
+      await executor.fillInput(1, 'TestPilot@2026');
+      await executor.clickButton(0, '提交注册');
+
+      const result = await executor.page.textContent('#result');
+      expect(result).toContain('注册成功:tp-test@example.com');
+    } finally {
+      await executor.dispose();
+    }
+  }, 60_000);
+
   it('目标不可达:尽早终止并产出 Critical「无法访问」缺陷,不烧步数预算', async () => {
     const deadUrl = 'http://127.0.0.1:9/'; // discard 端口,必然拒绝连接
     const dir = await mkdtemp(path.join(os.tmpdir(), 'testpilot-unreachable-'));

@@ -10,7 +10,7 @@ export interface ExplorerOptions {
   goal?: string;
   stepBudget: number;
   outDir: string;
-  mode: 'heuristic' | 'ai';
+  mode: 'heuristic' | 'ai' | 'cli';
   detectors?: readonly Detector[];
   onProgress?: (message: string) => void;
 }
@@ -25,6 +25,7 @@ export class Explorer {
   private readonly steps: StepRecord[] = [];
   private readonly findings: Finding[] = [];
   private readonly visitedUrls = new Set<string>();
+  private lastScreenshotAbs?: string;
 
   constructor(
     private readonly executor: WebExecutor,
@@ -69,6 +70,7 @@ export class Explorer {
         goal: this.opts.goal,
         stepSeq: seq + 1,
         stepBudget: this.opts.stepBudget,
+        lastScreenshot: this.lastScreenshotAbs,
       });
       if (!plan) {
         this.opts.onProgress?.('探索收敛:没有更多可探索的目标');
@@ -126,7 +128,9 @@ export class Explorer {
   /** 截图 + 落轨迹 + 消化这一步产生的信号 */
   private async recordStep(seq: number, description: string, shotsDir: string): Promise<void> {
     const screenshotFile = path.join('screenshots', `step-${String(seq).padStart(3, '0')}.png`);
-    await this.executor.screenshot(path.join(shotsDir, path.basename(screenshotFile)));
+    const screenshotAbs = path.join(shotsDir, path.basename(screenshotFile));
+    await this.executor.screenshot(screenshotAbs);
+    this.lastScreenshotAbs = screenshotAbs;
 
     const pageUrl = this.executor.page.url();
     const pageTitle = await this.executor.page.title().catch(() => '');

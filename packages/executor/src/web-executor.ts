@@ -4,7 +4,8 @@ import type { Signal } from '@testpilot/shared';
 /** 页面上可交互的候选目标(供探索大脑决策) */
 export type Interactable =
   | { kind: 'link'; text: string; url: string }
-  | { kind: 'button'; text: string; nth: number };
+  | { kind: 'button'; text: string; nth: number }
+  | { kind: 'input'; label: string; inputType: string; nth: number };
 
 export interface Observation {
   pageUrl: string;
@@ -153,22 +154,37 @@ export class WebExecutor {
           text: ((el.innerText || el.value) || '').trim().slice(0, 60),
           nth: i,
         }));
-      return { links, buttons };
+      const labelFor = (el) => {
+        if (el.labels && el.labels.length > 0) return el.labels[0].textContent || '';
+        return el.getAttribute('aria-label') || el.placeholder || el.name || '';
+      };
+      const inputs = [...document.querySelectorAll(
+        'input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=checkbox]):not([type=radio]), textarea'
+      )]
+        .filter(visible)
+        .map((el, i) => ({
+          label: labelFor(el).trim().slice(0, 60),
+          inputType: (el.type || 'text'),
+          nth: i,
+        }));
+      return { links, buttons, inputs };
     })()`;
 
     interface RawCollect {
       links: { text: string; href: string }[];
       buttons: { text: string; nth: number }[];
+      inputs: { label: string; inputType: string; nth: number }[];
     }
     const collect = (): Promise<RawCollect> =>
       (this.page.evaluate(COLLECT_SCRIPT) as Promise<RawCollect>).catch(() => ({
         links: [],
         buttons: [],
+        inputs: [],
       }));
 
     let raw = await collect();
     // SPA 首屏可能还在渲染:一个可交互元素都没有时等一拍重试一次
-    if (raw.links.length === 0 && raw.buttons.length === 0) {
+    if (raw.links.length === 0 && raw.buttons.length === 0 && raw.inputs.length === 0) {
       await this.page.waitForTimeout(1500);
       raw = await collect();
     }
@@ -186,6 +202,9 @@ export class WebExecutor {
     for (const b of raw.buttons) {
       interactables.push({ kind: 'button', text: b.text, nth: b.nth });
     }
+    for (const i of raw.inputs) {
+      interactables.push({ kind: 'input', label: i.label, inputType: i.inputType, nth: i.nth });
+    }
     return { pageUrl, pageTitle, interactables };
   }
 
@@ -201,6 +220,17 @@ export class WebExecutor {
       : base.locator('visible=true').nth(nth);
     await locator.click({ timeout: this.opts.actionTimeout }).catch(() => {});
     await this.page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+  }
+
+  /** 填写第 nth 个可见输入框(与 observe 的枚举顺序一致) */
+  async fillInput(nth: number, value: string): Promise<void> {
+    const locator = this.page
+      .locator(
+        'input:not([type=hidden]):not([type=submit]):not([type=button]):not([type=checkbox]):not([type=radio]), textarea',
+      )
+      .locator('visible=true')
+      .nth(nth);
+    await locator.fill(value, { timeout: this.opts.actionTimeout }).catch(() => {});
   }
 
   async dispose(): Promise<void> {

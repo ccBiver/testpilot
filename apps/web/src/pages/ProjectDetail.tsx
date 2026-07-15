@@ -17,7 +17,7 @@ export default function ProjectDetail() {
   const [tab, setTab] = useState<'runs' | 'issues'>('runs');
   const [goal, setGoal] = useState('');
   const [steps, setSteps] = useState('30');
-  const [mode, setMode] = useState<'heuristic' | 'ai'>('heuristic');
+  const [mode, setMode] = useState<'heuristic' | 'ai' | 'cli'>('heuristic');
   const [error, setError] = useState('');
   const [launching, setLaunching] = useState(false);
 
@@ -94,11 +94,12 @@ export default function ProjectDetail() {
                 <span className="mb-1.5 block text-sm font-medium text-slate-600">模式</span>
                 <select
                   value={mode}
-                  onChange={(e) => setMode(e.target.value as 'heuristic' | 'ai')}
+                  onChange={(e) => setMode(e.target.value as 'heuristic' | 'ai' | 'cli')}
                   className="input-glow w-full cursor-pointer rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm outline-none"
                 >
                   <option value="heuristic">启发式(免费冒烟)</option>
-                  <option value="ai">AI 探索(需模型)</option>
+                  <option value="ai">AI 探索(需模型 Key)</option>
+                  <option value="cli">AI·本地 CLI(Claude Code)</option>
                 </select>
               </label>
               <div className="flex items-end">
@@ -111,9 +112,12 @@ export default function ProjectDetail() {
               <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm font-medium text-rose-600">{error}</p>
             )}
             <p className="mt-3 text-xs text-slate-400">
-              {mode === 'heuristic'
-                ? '启发式:零成本爬行,会优先点击与目标相关的链接和按钮,但不会填写表单;要完整走注册/下单等流程请用 AI 探索。'
-                : 'AI 探索:多模态模型像真实用户一样操作,可填表单、走完整业务流程;按步数消耗模型费用。'}
+              {mode === 'heuristic' &&
+                '启发式:零成本爬行,会优先点击与目标相关的链接和按钮,但不会填写表单;要完整走注册/下单等流程请用 AI 模式。'}
+              {mode === 'ai' &&
+                'AI 探索:多模态模型像真实用户一样操作,可填表单、走完整业务流程;用「设置」里配置的模型 Key,按步数计费。'}
+              {mode === 'cli' &&
+                'AI·本地 CLI:用平台所在机器的 Claude Code 订阅做决策,零 API 费用,可填表单走完整流程;每步约 5~15 秒,适合本机自用。'}
             </p>
           </motion.form>
 
@@ -157,7 +161,7 @@ export default function ProjectDetail() {
                 >
                   <RunStatusBadge status={r.status} />
                   <span className="text-sm font-medium">
-                    {r.mode === 'ai' ? 'AI 探索' : '启发式'}
+                    {r.mode === 'ai' ? 'AI 探索' : r.mode === 'cli' ? 'AI·本地 CLI' : '启发式'}
                     {r.goal ? ` · ${r.goal}` : ''}
                   </span>
                   <span className="ml-auto flex items-center gap-1.5 text-sm">

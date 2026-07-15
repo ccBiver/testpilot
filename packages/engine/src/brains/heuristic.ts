@@ -2,6 +2,8 @@ import { normalizeUrl } from '@testpilot/shared';
 import { checkGuardrail, type Interactable, type WebExecutor } from '@testpilot/executor';
 import type { Brain, BrainContext, StepPlan } from './types.js';
 
+type Clickable = Extract<Interactable, { kind: 'link' | 'button' }>;
+
 /**
  * 启发式大脑:不调用任何模型,零成本冒烟爬行。
  * 策略:与探索目标相关的元素最优先(关键词匹配),其次未访问链接(BFS 味道),
@@ -31,9 +33,14 @@ export class HeuristicBrain implements Brain {
   }
 
   async nextStep(obs: Parameters<Brain['nextStep']>[0], _ctx: BrainContext): Promise<StepPlan | null> {
+    // 启发式只处理链接与按钮;输入框由 AI/CLI 大脑负责
+    const clickables = obs.interactables.filter(
+      (i): i is Clickable => i.kind === 'link' || i.kind === 'button',
+    );
+
     // 0. 目标相关元素最优先:文案命中目标关键词的链接/按钮
     if (this.goalTerms.length > 0) {
-      const scored = obs.interactables
+      const scored = clickables
         .map((item) => ({ item, score: scoreByTerms(item.text, this.goalTerms) }))
         .filter(({ item, score }) => score > 0 && this.isFresh(item, obs.pageUrl))
         .sort((a, b) => b.score - a.score);
@@ -42,7 +49,7 @@ export class HeuristicBrain implements Brain {
     }
 
     // 1. 未访问的同站链接
-    for (const item of obs.interactables) {
+    for (const item of clickables) {
       if (item.kind !== 'link') continue;
       if (!this.isFresh(item, obs.pageUrl)) continue;
       if (!this.allowed(item.text || item.url)) continue;
@@ -50,7 +57,7 @@ export class HeuristicBrain implements Brain {
     }
 
     // 2. 当前页未点击过的按钮
-    for (const item of obs.interactables) {
+    for (const item of clickables) {
       if (item.kind !== 'button') continue;
       if (!this.isFresh(item, obs.pageUrl)) continue;
       if (!this.allowed(item.text)) continue;
@@ -71,14 +78,14 @@ export class HeuristicBrain implements Brain {
   }
 
   /** 该元素是否还没被消费过 */
-  private isFresh(item: Interactable, pageUrl: string): boolean {
+  private isFresh(item: Clickable, pageUrl: string): boolean {
     return item.kind === 'link'
       ? !this.visited.has(normalizeUrl(item.url))
       : !this.clickedButtons.has(buttonKey(item, pageUrl));
   }
 
   /** 生成执行计划并登记去重 */
-  private planFor(item: Interactable, pageUrl: string, tag = ''): StepPlan {
+  private planFor(item: Clickable, pageUrl: string, tag = ''): StepPlan {
     this.consecutiveReturns = 0; // 找到新目标即视为有进展
 
     if (item.kind === 'link') {
@@ -108,7 +115,7 @@ function buttonKey(item: Extract<Interactable, { kind: 'button' }>, pageUrl: str
   return `${normalizeUrl(pageUrl)}::${item.text}::${item.nth}`;
 }
 
-function labelOf(item: Interactable): string {
+function labelOf(item: Clickable): string {
   return item.kind === 'button' ? item.text || `#${item.nth}` : item.text || item.url;
 }
 

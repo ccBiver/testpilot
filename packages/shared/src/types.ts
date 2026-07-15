@@ -74,7 +74,7 @@ export interface Finding {
 /** 一次运行的完整报告 */
 export interface RunReport {
   runId: string;
-  mode: 'heuristic' | 'ai';
+  mode: 'heuristic' | 'ai' | 'cli';
   targetUrl: string;
   goal?: string;
   startedAt: number;
