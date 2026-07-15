@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState, type FormEvent } from 'react';
 import ConsoleShell from '../components/ConsoleShell';
+import RunnerTokenSection from '../components/RunnerTokenSection';
 import { IconSparkles } from '../components/Icons';
 import { DotLoader, GhostButton, GradientButton, TextInput } from '../components/Ui';
 import { api, ApiError, type ApiModelConfig } from '../lib/api';
@@ -171,6 +172,8 @@ export default function Settings() {
               </p>
             </motion.form>
           )}
+
+          <RunnerTokenSection />
         </div>
       )}
     </ConsoleShell>

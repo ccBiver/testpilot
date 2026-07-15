@@ -23,6 +23,20 @@ model User {
   runs         Run[]
   issues       Issue[]
   modelConfig  ModelConfig?
+  runnerTokens RunnerToken[]
+}
+
+// 自托管 Runner 的接入凭证:明文只在创建时返回一次,库里只存 sha256
+model RunnerToken {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  tokenHash  String    @unique
+  lastSeenAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
 }
 
 // 用户自带模型 Key(BYOK):apiKey 用 AES-256-GCM 加密落库,永不明文返回
@@ -89,8 +103,10 @@ model Run {
   project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   userId     String
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // heuristic | ai
+  // heuristic | ai | cli
   mode       String    @default("heuristic")
+  // cloud(平台执行)| runner(用户本机 Runner 领取执行)
+  executor   String    @default("cloud")
   // queued | running | done | failed
   status     String    @default("queued")
   goal       String?

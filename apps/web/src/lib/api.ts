@@ -133,6 +133,7 @@ export interface ApiRun {
   id: string;
   projectId: string;
   mode: 'heuristic' | 'ai' | 'cli';
+  executor: 'cloud' | 'runner';
   status: 'queued' | 'running' | 'done' | 'failed';
   goal: string | null;
   stepBudget: number;
@@ -144,6 +145,13 @@ export interface ApiRun {
   startedAt: string | null;
   finishedAt: string | null;
   report: ApiRunReport | null;
+}
+
+export interface ApiRunnerToken {
+  id: string;
+  name: string;
+  lastSeenAt: string | null;
+  createdAt: string;
 }
 
 export type IssueStatus = 'open' | 'confirmed' | 'fixing' | 'closed' | 'false_positive';
@@ -220,7 +228,10 @@ export const api = {
   listRuns: (projectId: string) =>
     request<{ runs: ApiRun[] }>(`/api/projects/${projectId}/runs`).then((d) => d.runs),
 
-  createRun: (projectId: string, input: { mode: string; goal?: string; stepBudget: number }) =>
+  createRun: (
+    projectId: string,
+    input: { mode: string; executor?: string; goal?: string; stepBudget: number },
+  ) =>
     request<{ run: ApiRun }>(`/api/projects/${projectId}/runs`, {
       method: 'POST',
       body: input,
@@ -256,6 +267,18 @@ export const api = {
 
   clearModelConfig: () =>
     request<{ deleted: boolean }>('/api/settings/model', { method: 'DELETE' }),
+
+  listRunnerTokens: () =>
+    request<{ tokens: ApiRunnerToken[] }>('/api/settings/runner-tokens').then((d) => d.tokens),
+
+  createRunnerToken: (name: string) =>
+    request<{ token: ApiRunnerToken; plaintext: string }>('/api/settings/runner-tokens', {
+      method: 'POST',
+      body: { name },
+    }),
+
+  deleteRunnerToken: (id: string) =>
+    request<{ deleted: boolean }>(`/api/settings/runner-tokens/${id}`, { method: 'DELETE' }),
 
   /** 截图需带鉴权,取回 blob URL(调用方负责 revoke) */
   async fetchArtifact(runId: string, screenshotFile: string): Promise<string> {

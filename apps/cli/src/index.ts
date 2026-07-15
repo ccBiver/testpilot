@@ -54,6 +54,22 @@ program
     }
   });
 
+program
+  .command('runner')
+  .description('启动自托管 Runner:领取平台任务在本机执行(可用本机 claude 订阅与内网)')
+  .requiredOption('-t, --token <token>', 'Runner Token(控制台「设置」页创建,tpr_ 开头)')
+  .option('--server <url>', '平台地址', 'http://localhost:3100')
+  .action(async (opts) => {
+    const { Runner } = await import('./runner.js');
+    const runner = new Runner({ serverUrl: opts.server, token: opts.token });
+    process.on('SIGINT', () => {
+      console.log('\n👋 Runner 退出');
+      runner.stop();
+      process.exit(0);
+    });
+    await runner.loop();
+  });
+
 program.parseAsync().catch((err) => {
   console.error('❌ 运行失败:', err instanceof Error ? err.message : err);
   process.exit(1);

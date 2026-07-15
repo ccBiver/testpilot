@@ -18,6 +18,7 @@ export default function ProjectDetail() {
   const [goal, setGoal] = useState('');
   const [steps, setSteps] = useState('30');
   const [mode, setMode] = useState<'heuristic' | 'ai' | 'cli'>('heuristic');
+  const [executor, setExecutor] = useState<'cloud' | 'runner'>('cloud');
   const [error, setError] = useState('');
   const [launching, setLaunching] = useState(false);
 
@@ -44,6 +45,7 @@ export default function ProjectDetail() {
     try {
       const run = await api.createRun(id, {
         mode,
+        executor,
         goal: goal.trim() || undefined,
         stepBudget: Number(steps) || 30,
       });
@@ -72,7 +74,7 @@ export default function ProjectDetail() {
             className="mt-6 rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm"
           >
             <h2 className="font-bold">发起探索</h2>
-            <div className="mt-4 grid gap-4 sm:grid-cols-[2fr_1fr_1fr_auto]">
+            <div className="mt-4 grid gap-4 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
               <TextInput
                 label="探索目标(可选)"
                 placeholder="比如:重点测试注册与下单流程"
@@ -102,6 +104,17 @@ export default function ProjectDetail() {
                   <option value="cli">AI·本地 CLI(Claude Code)</option>
                 </select>
               </label>
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-slate-600">执行位置</span>
+                <select
+                  value={executor}
+                  onChange={(e) => setExecutor(e.target.value as 'cloud' | 'runner')}
+                  className="input-glow w-full cursor-pointer rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm outline-none"
+                >
+                  <option value="cloud">平台执行</option>
+                  <option value="runner">本机 Runner</option>
+                </select>
+              </label>
               <div className="flex items-end">
                 <GradientButton type="submit" disabled={launching} className="inline-flex items-center gap-1.5 !py-3 text-sm">
                   {launching ? '排队中…' : <>开测 <IconArrowRight className="h-4 w-4" /></>}
@@ -117,7 +130,9 @@ export default function ProjectDetail() {
               {mode === 'ai' &&
                 'AI 探索:多模态模型像真实用户一样操作,可填表单、走完整业务流程;用「设置」里配置的模型 Key,按步数计费。'}
               {mode === 'cli' &&
-                'AI·本地 CLI:用平台所在机器的 Claude Code 订阅做决策,零 API 费用,可填表单走完整流程;每步约 5~15 秒,适合本机自用。'}
+                'AI·本地 CLI:用执行机器的 Claude Code 订阅做决策,零 API 费用,可填表单走完整流程;每步约 5~15 秒,适合本机自用。'}
+              {executor === 'runner' &&
+                ' · 本机 Runner:任务由你电脑上的 runner 领取执行(可测内网/localhost),需先在「设置」创建 Token 并启动 runner。'}
             </p>
           </motion.form>
 
@@ -164,6 +179,11 @@ export default function ProjectDetail() {
                     {r.mode === 'ai' ? 'AI 探索' : r.mode === 'cli' ? 'AI·本地 CLI' : '启发式'}
                     {r.goal ? ` · ${r.goal}` : ''}
                   </span>
+                  {r.executor === 'runner' && (
+                    <span className="rounded-full bg-cyan-50 px-2 py-0.5 text-xs font-semibold text-cyan-600">
+                      本机 Runner
+                    </span>
+                  )}
                   <span className="ml-auto flex items-center gap-1.5 text-sm">
                     {r.status === 'done' && (
                       <>

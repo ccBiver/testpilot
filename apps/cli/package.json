@@ -12,6 +12,7 @@
   "dependencies": {
     "@testpilot/engine": "workspace:*",
     "@testpilot/executor": "workspace:*",
+    "@testpilot/shared": "workspace:*",
     "commander": "^13.1.0",
     "tsx": "^4.19.0"
   },
