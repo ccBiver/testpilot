@@ -51,11 +51,17 @@ async function request<T>(
   if (body !== undefined) headers['content-type'] = 'application/json';
   if (tokenStore.access) headers.authorization = `Bearer ${tokenStore.access}`;
 
-  const res = await fetch(path, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    // fetch 层失败 = 后端不可达,与业务错误明确区分
+    throw new ApiError(0, '连接不上服务器:请确认本地服务已启动(pm2 status)');
+  }
 
   if (res.status === 401 && retryOn401 && tokenStore.refresh) {
     const refreshed = await tryRefresh();
