@@ -184,6 +184,30 @@ describe('平台化模式:统一模型 / 注册开关 / Runner 权限', () => {
     });
   });
 
+  describe('CLI 模式执行位置', () => {
+    it('平台服务器无 Claude CLI 时,cli+平台执行被拦截并提示用 Runner', async () => {
+      const proj = await app.inject({
+        method: 'POST',
+        url: '/api/projects',
+        headers: memberHeaders,
+        payload: { name: 'CLI 检查', targetUrl: 'https://example.com/' },
+      });
+      process.env.TESTPILOT_FORCE_NO_CLI = '1';
+      try {
+        const run = await app.inject({
+          method: 'POST',
+          url: `/api/projects/${proj.json().data.project.id}/runs`,
+          headers: memberHeaders,
+          payload: { mode: 'cli', executor: 'cloud', stepBudget: 3 },
+        });
+        expect(run.statusCode).toBe(400);
+        expect(run.json().error).toContain('本机 Runner');
+      } finally {
+        delete process.env.TESTPILOT_FORCE_NO_CLI;
+      }
+    });
+  });
+
   describe('注册开关', () => {
     it('关闭后新注册被拒,已有用户登录不受影响;重新打开恢复', async () => {
       await app.inject({

@@ -130,9 +130,16 @@ export default function ProjectDetail() {
               {mode === 'ai' &&
                 'AI 探索:多模态模型像真实用户一样操作,可填表单、走完整业务流程;由平台内置模型供能,无需任何配置。'}
               {mode === 'cli' &&
-                'AI·本地 CLI:用执行机器的 Claude Code 订阅做决策,零 API 费用,可填表单走完整流程;每步约 5~15 秒,适合本机自用。'}
+                'AI·本地 CLI:用执行机器上的 Claude Code 订阅做决策,零 API 费用,可填表单走完整流程;每步约 5~15 秒。'}
               {executor === 'runner' &&
                 ' · 本机 Runner:任务由你电脑上的 runner 领取执行(可测内网/localhost),需先在「设置」创建 Token 并启动 runner。'}
+              {executor === 'cloud' && ' · 平台执行:任务在平台服务器上运行,适合测公网站点。'}
+              {mode === 'cli' && executor === 'cloud' && (
+                <span className="font-semibold text-amber-600">
+                  {' '}
+                  注意:CLI 模式在「平台执行」要求平台服务器装有 Claude CLI(自托管部署适用);一般请选「本机 Runner」。
+                </span>
+              )}
             </p>
           </motion.form>
 
