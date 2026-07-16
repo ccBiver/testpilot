@@ -6,7 +6,6 @@ import ProjectDetail from './pages/ProjectDetail';
 import RunDetail from './pages/RunDetail';
 import IssueDetail from './pages/IssueDetail';
 import Settings from './pages/Settings';
-import Admin from './pages/Admin';
 
 export default function App() {
   return (
@@ -19,7 +18,6 @@ export default function App() {
       <Route path="/console/runs/:id" element={<RunDetail />} />
       <Route path="/console/issues/:id" element={<IssueDetail />} />
       <Route path="/console/settings" element={<Settings />} />
-      <Route path="/admin" element={<Admin />} />
     </Routes>
   );
 }

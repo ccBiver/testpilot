@@ -175,47 +175,7 @@ export interface ApiIssue {
   finding: ApiFinding | null;
 }
 
-/** 平台模型配置(仅管理员可见;Key 永不回传) */
-export interface ApiPlatformModel {
-  baseUrl: string;
-  modelName: string;
-  vlMode: string;
-  hasApiKey: boolean;
-}
-
-export interface ApiAdminStats {
-  users: number;
-  activeUsers: number;
-  projects: number;
-  runsTotal: number;
-  runsActive: number;
-  issuesOpen: number;
-  issuesTotal: number;
-}
-
-export interface ApiAdminUser {
-  id: string;
-  email: string;
-  role: string;
-  status: 'active' | 'disabled';
-  runnerEnabled: boolean;
-  quota: number;
-  createdAt: string;
-  projectCount: number;
-  runCount: number;
-}
-
-export interface ApiAdminRun {
-  id: string;
-  userEmail: string;
-  projectName: string;
-  mode: string;
-  executor: string;
-  status: 'queued' | 'running' | 'done' | 'failed';
-  findingsCount: number;
-  stepsTaken: number;
-  createdAt: string;
-}
+// 管理接口在独立的管理后台站点(apps/admin)调用,用户端不包含任何管理代码
 
 export const api = {
   async register(email: string, password: string): Promise<ApiUser> {
@@ -294,20 +254,6 @@ export const api = {
       body: { status },
     }).then((d) => d.issue),
 
-  adminGetModelConfig: () =>
-    request<{ model: ApiPlatformModel | null }>('/api/admin/model-config').then((d) => d.model),
-
-  adminSaveModelConfig: (input: { apiKey?: string; baseUrl: string; modelName: string; vlMode: string }) =>
-    request<{ model: ApiPlatformModel }>('/api/admin/model-config', { method: 'PUT', body: input }).then(
-      (d) => d.model,
-    ),
-
-  adminGetRegistration: () =>
-    request<{ enabled: boolean }>('/api/admin/registration').then((d) => d.enabled),
-
-  adminSetRegistration: (enabled: boolean) =>
-    request<{ enabled: boolean }>('/api/admin/registration', { method: 'PUT', body: { enabled } }),
-
   listRunnerTokens: () =>
     request<{ tokens: ApiRunnerToken[] }>('/api/settings/runner-tokens').then((d) => d.tokens),
 
@@ -319,30 +265,6 @@ export const api = {
 
   deleteRunnerToken: (id: string) =>
     request<{ deleted: boolean }>(`/api/settings/runner-tokens/${id}`, { method: 'DELETE' }),
-
-  adminStats: () => request<{ stats: ApiAdminStats }>('/api/admin/stats').then((d) => d.stats),
-
-  adminUsers: () => request<{ users: ApiAdminUser[] }>('/api/admin/users').then((d) => d.users),
-
-  adminPatchUser: (
-    id: string,
-    patch: { status?: 'active' | 'disabled'; runnerEnabled?: boolean; quota?: number },
-  ) =>
-    request<{ user: { id: string; status: string; runnerEnabled: boolean; quota: number } }>(
-      `/api/admin/users/${id}`,
-      { method: 'PATCH', body: patch },
-    ),
-
-  adminGetQuota: () =>
-    request<{ defaultFreeRuns: number }>('/api/admin/quota').then((d) => d.defaultFreeRuns),
-
-  adminSetQuota: (defaultFreeRuns: number) =>
-    request<{ defaultFreeRuns: number }>('/api/admin/quota', {
-      method: 'PUT',
-      body: { defaultFreeRuns },
-    }),
-
-  adminRuns: () => request<{ runs: ApiAdminRun[] }>('/api/admin/runs').then((d) => d.runs),
 
   /** 截图需带鉴权,取回 blob URL(调用方负责 revoke) */
   async fetchArtifact(runId: string, screenshotFile: string): Promise<string> {

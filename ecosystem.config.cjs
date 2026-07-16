@@ -22,5 +22,14 @@ module.exports = {
       autorestart: true,
       max_restarts: 10,
     },
+    {
+      name: 'testpilot-admin',
+      cwd: `${__dirname}/apps/admin`,
+      script: PNPM,
+      args: 'dev',
+      interpreter: 'none',
+      autorestart: true,
+      max_restarts: 10,
+    },
   ],
 };

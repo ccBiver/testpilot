@@ -1,17 +1,17 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { IconFolder, IconLogout, IconSettings, IconShield, Logo } from './Icons';
+import { IconFolder, IconLogout, IconSettings, Logo } from './Icons';
 import { api, tokenStore, type ApiUser } from '../lib/api';
 
 interface NavItem {
   to: string;
   label: string;
   icon: typeof IconFolder;
-  adminOnly?: boolean;
   /** 判断当前路由是否属于该导航项 */
   isActive: (path: string) => boolean;
 }
 
+// 管理能力在独立的管理后台站点(apps/admin),用户端不出现任何管理入口
 const NAV_ITEMS: NavItem[] = [
   {
     to: '/console',
@@ -24,13 +24,6 @@ const NAV_ITEMS: NavItem[] = [
     label: '设置',
     icon: IconSettings,
     isActive: (p) => p.startsWith('/console/settings'),
-  },
-  {
-    to: '/admin',
-    label: '管理后台',
-    icon: IconShield,
-    adminOnly: true,
-    isActive: (p) => p.startsWith('/admin'),
   },
 ];
 
@@ -62,7 +55,7 @@ export default function ConsoleShell({ children }: { children: (user: ApiUser) =
     );
   }
 
-  const items = NAV_ITEMS.filter((i) => !i.adminOnly || user.role === 'admin');
+  const items = NAV_ITEMS;
   const logout = () => {
     api.logout();
     navigate('/', { replace: true });
