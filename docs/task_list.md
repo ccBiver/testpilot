@@ -64,12 +64,14 @@
 - [x] 验收:注册→建项目→发起探索→看板出 Bug→标记误报/确认,admin 独立后台
       管理用户/额度/模型,全链路多轮实测通过
 
-## M2 — Android 接入(约 1~1.5 周)
+## M2 — Android 接入(约 1~1.5 周)⬅ 当前
 
-- [ ] executor 增加 Android 适配(Midscene android + adb),模拟器优先
-- [ ] logcat 崩溃/ANR 检测器
-- [ ] 平台 Target 支持 apk 上传/包名 + 设备选择
-- [ ] 验收:对楠哥快跑或任一 demo App 完成一次探索并出报告
+- [x] executor 增加 Android 适配(Midscene @midscene/android + adb),ExplorerTarget
+      接口泛化 Explorer(Web/Android 共用);实测连模拟器启动 Settings+截图打通(2026-07-16)
+- [x] logcat 崩溃/ANR 检测器(FATAL→Critical / ANR→High,按包名+异常类名去重)
+- [x] AndroidAiBrain 视觉驱动大脑 + CLI explore-app 命令(2026-07-16)
+- [ ] 平台侧:发起表单支持 Android 目标(包名/APK)+ 设备选择 + Runner 下发 Android 任务
+- [ ] 验收:配好模型 key 后对 demo App 完成一次 AI 探索并出报告(需 DashScope key)
 
 ## M3 — 用例导入与回归(约 1.5 周)
 
