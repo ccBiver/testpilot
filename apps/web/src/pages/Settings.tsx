@@ -23,7 +23,8 @@ export default function Settings() {
             <div className="text-sm leading-relaxed text-slate-600">
               <b className="text-slate-800">AI 探索由平台内置模型供能</b>
               <br />
-              无需配置任何 API Key,发起探索时选「AI 探索」即可,模型费用由平台承担。
+              无需配置任何 API Key,每次探索消耗 1 次额度,当前剩余{' '}
+              <b className="text-indigo-600">{user.quota}</b> 次。额度用完可联系管理员增加。
             </div>
           </motion.div>
 

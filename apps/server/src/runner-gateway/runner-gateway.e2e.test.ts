@@ -129,10 +129,11 @@ describe('Runner 网关端到端', () => {
       method: 'POST',
       url: `/api/projects/${projectId}/runs`,
       headers: authed,
-      payload: { mode: 'heuristic', executor: 'runner', stepBudget: 10 },
+      payload: { useRunner: true, stepBudget: 10 },
     });
     expect(res.statusCode).toBe(201);
     expect(res.json().data.run.executor).toBe('runner');
+    expect(res.json().data.run.mode).toBe('cli');
     expect(res.json().data.run.status).toBe('queued');
   });
 
@@ -217,7 +218,7 @@ describe('Runner 网关端到端', () => {
       method: 'POST',
       url: `/api/projects/${projectId}/runs`,
       headers: authed,
-      payload: { mode: 'heuristic', executor: 'runner', stepBudget: 5 },
+      payload: { useRunner: true, stepBudget: 5 },
     });
     const claim = await app.inject({
       method: 'POST',

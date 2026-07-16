@@ -19,6 +19,8 @@ model User {
   status       String    @default("active")
   // 自托管 Runner 权限,由管理员开通(商业化能力开关)
   runnerEnabled Boolean  @default(false)
+  // 剩余 AI 探索额度(平台执行消耗;Runner/CLI 执行不消耗),注册时取平台默认值
+  quota         Int      @default(10)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   projects     Project[]

@@ -14,7 +14,10 @@ const KEYS = {
   modelName: 'model.modelName',
   modelVlMode: 'model.vlMode',
   registration: 'registration.enabled',
+  defaultQuota: 'quota.defaultFreeRuns',
 } as const;
+
+const DEFAULT_FREE_RUNS = 10;
 
 async function getValue(prisma: PrismaClient, key: string): Promise<string | null> {
   const row = await prisma.systemConfig.findUnique({ where: { key } });
@@ -96,6 +99,17 @@ export async function getPlatformModelPublic(prisma: PrismaClient): Promise<{
     vlMode: vlMode ?? 'none',
     hasApiKey: apiKeyEnc !== null,
   };
+}
+
+/** 新用户注册赠送的 AI 探索额度 */
+export async function getDefaultFreeRuns(prisma: PrismaClient): Promise<number> {
+  const raw = await getValue(prisma, KEYS.defaultQuota);
+  const parsed = raw === null ? Number.NaN : Number(raw);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : DEFAULT_FREE_RUNS;
+}
+
+export async function setDefaultFreeRuns(prisma: PrismaClient, value: number): Promise<void> {
+  await setValue(prisma, KEYS.defaultQuota, String(value));
 }
 
 /** 注册开关,默认开放 */

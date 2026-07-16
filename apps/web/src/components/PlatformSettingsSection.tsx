@@ -18,6 +18,8 @@ export default function PlatformSettingsSection() {
   const [modelName, setModelName] = useState('');
   const [vlMode, setVlMode] = useState<'none' | 'qwen'>('none');
   const [registration, setRegistration] = useState(true);
+  const [defaultQuota, setDefaultQuota] = useState('10');
+  const [quotaSaved, setQuotaSaved] = useState(false);
   const [message, setMessage] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -34,7 +36,23 @@ export default function PlatformSettingsSection() {
       })
       .catch(() => {});
     api.adminGetRegistration().then(setRegistration).catch(() => {});
+    api.adminGetQuota().then((n) => setDefaultQuota(String(n))).catch(() => {});
   }, []);
+
+  const saveQuota = async () => {
+    const value = Number(defaultQuota);
+    if (!Number.isInteger(value) || value < 0) {
+      setMessage({ kind: 'err', text: '默认额度必须是非负整数' });
+      return;
+    }
+    try {
+      await api.adminSetQuota(value);
+      setQuotaSaved(true);
+      setTimeout(() => setQuotaSaved(false), 2000);
+    } catch (err) {
+      setMessage({ kind: 'err', text: err instanceof ApiError ? err.message : '保存失败' });
+    }
+  };
 
   const applyPreset = () => {
     setBaseUrl(DASHSCOPE_PRESET.baseUrl);
@@ -179,6 +197,30 @@ export default function PlatformSettingsSection() {
         <p className={`mt-2 text-xs font-semibold ${registration ? 'text-emerald-600' : 'text-slate-400'}`}>
           {registration ? '开放注册中' : '已关闭注册'}
         </p>
+
+        <div className="mt-6 border-t border-slate-100 pt-5">
+          <h2 className="font-bold">新用户免费额度</h2>
+          <p className="mt-1 text-xs leading-relaxed text-slate-400">
+            注册即赠送的 AI 探索次数,仅对之后注册的新用户生效。
+          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <input
+              type="number"
+              min={0}
+              value={defaultQuota}
+              onChange={(e) => setDefaultQuota(e.target.value)}
+              className="input-glow w-24 rounded-xl border-2 border-slate-200 bg-white px-3 py-2 text-sm outline-none"
+            />
+            <span className="text-xs text-slate-400">次</span>
+            <button
+              type="button"
+              onClick={saveQuota}
+              className="cursor-pointer rounded-full bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-600 transition-colors hover:bg-indigo-100"
+            >
+              {quotaSaved ? '已保存 ✓' : '保存'}
+            </button>
+          </div>
+        </div>
       </motion.div>
     </div>
   );

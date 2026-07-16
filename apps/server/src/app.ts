@@ -15,6 +15,12 @@ import { registerRunnerGatewayRoutes } from './runner-gateway/routes.js';
 import { registerAdminRoutes } from './admin/routes.js';
 import { RunQueue } from './runs/runner.js';
 
+declare module 'fastify' {
+  interface FastifyInstance {
+    runQueue: RunQueue;
+  }
+}
+
 /** 组装 Fastify 应用(与监听分离,测试用 app.inject 直连) */
 export async function buildApp(config: ServerConfig, prisma: PrismaClient): Promise<FastifyInstance> {
   const app = Fastify({ logger: process.env.NODE_ENV !== 'test' });
@@ -48,6 +54,8 @@ export async function buildApp(config: ServerConfig, prisma: PrismaClient): Prom
 
   const requireAuth = makeRequireAuth(auth);
   const queue = new RunQueue(prisma, config.artifactsRoot ?? path.resolve('data/artifacts'), config.jwtSecret);
+  // 暴露队列供内部冒烟测试直接触发(启发式引擎保留为内部能力,不再对用户开放)
+  app.decorate('runQueue', queue);
   registerProjectRoutes(app, prisma, requireAuth);
   registerRunRoutes(app, prisma, queue, requireAuth);
   registerIssueRoutes(app, prisma, requireAuth);

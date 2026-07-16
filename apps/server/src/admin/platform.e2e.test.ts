@@ -109,7 +109,7 @@ describe('平台化模式:统一模型 / 注册开关 / Runner 权限', () => {
       ).toBe(403);
     });
 
-    it('平台配置就绪后,普通用户可发起云端 AI 探索(无需自己的 Key)', async () => {
+    it('平台配置就绪后,普通用户可直接发起 AI 探索(无需自己的 Key)', async () => {
       const proj = await app.inject({
         method: 'POST',
         url: '/api/projects',
@@ -120,9 +120,11 @@ describe('平台化模式:统一模型 / 注册开关 / Runner 权限', () => {
         method: 'POST',
         url: `/api/projects/${proj.json().data.project.id}/runs`,
         headers: memberHeaders,
-        payload: { mode: 'ai', executor: 'cloud', stepBudget: 3 },
+        payload: { stepBudget: 3 },
       });
       expect(run.statusCode).toBe(201);
+      expect(run.json().data.run.mode).toBe('ai');
+      expect(run.json().data.run.executor).toBe('cloud');
     });
   });
 
@@ -184,27 +186,99 @@ describe('平台化模式:统一模型 / 注册开关 / Runner 权限', () => {
     });
   });
 
-  describe('CLI 模式执行位置', () => {
-    it('平台服务器无 Claude CLI 时,cli+平台执行被拦截并提示用 Runner', async () => {
+  describe('免费额度体系', () => {
+    let quotaHeaders: Record<string, string>;
+    let quotaUserId: string;
+    let quotaProjectId: string;
+
+    it('管理员设置默认额度后,新用户按新额度发放', async () => {
+      const put = await app.inject({
+        method: 'PUT',
+        url: '/api/admin/quota',
+        headers: adminHeaders,
+        payload: { defaultFreeRuns: 2 },
+      });
+      expect(put.statusCode).toBe(200);
+
+      const reg = await app.inject({
+        method: 'POST',
+        url: '/api/auth/register',
+        payload: { email: 'quota@testpilot.dev', password: 'password123' },
+      });
+      expect(reg.json().data.user.quota).toBe(2);
+      quotaHeaders = { authorization: `Bearer ${reg.json().data.accessToken}` };
+      quotaUserId = reg.json().data.user.id;
+
       const proj = await app.inject({
         method: 'POST',
         url: '/api/projects',
-        headers: memberHeaders,
-        payload: { name: 'CLI 检查', targetUrl: 'https://example.com/' },
+        headers: quotaHeaders,
+        payload: { name: '额度项目', targetUrl: 'https://example.com/' },
       });
-      process.env.TESTPILOT_FORCE_NO_CLI = '1';
-      try {
+      quotaProjectId = proj.json().data.project.id;
+    });
+
+    it('每次平台 AI 探索消耗 1 次额度,用完 → 403', async () => {
+      for (let i = 0; i < 2; i++) {
         const run = await app.inject({
           method: 'POST',
-          url: `/api/projects/${proj.json().data.project.id}/runs`,
-          headers: memberHeaders,
-          payload: { mode: 'cli', executor: 'cloud', stepBudget: 3 },
+          url: `/api/projects/${quotaProjectId}/runs`,
+          headers: quotaHeaders,
+          payload: { stepBudget: 3 },
         });
-        expect(run.statusCode).toBe(400);
-        expect(run.json().error).toContain('本机 Runner');
-      } finally {
-        delete process.env.TESTPILOT_FORCE_NO_CLI;
+        expect(run.statusCode).toBe(201);
       }
+      const me = await app.inject({ method: 'GET', url: '/api/auth/me', headers: quotaHeaders });
+      expect(me.json().data.user.quota).toBe(0);
+
+      const exhausted = await app.inject({
+        method: 'POST',
+        url: `/api/projects/${quotaProjectId}/runs`,
+        headers: quotaHeaders,
+        payload: { stepBudget: 3 },
+      });
+      expect(exhausted.statusCode).toBe(403);
+      expect(exhausted.json().error).toContain('额度');
+    });
+
+    it('本机 Runner 执行不消耗额度(额度为 0 也能发起)', async () => {
+      await prisma.user.update({ where: { id: quotaUserId }, data: { runnerEnabled: true } });
+      await app.inject({
+        method: 'POST',
+        url: '/api/settings/runner-tokens',
+        headers: quotaHeaders,
+        payload: { name: '额度用户的机器' },
+      });
+      const run = await app.inject({
+        method: 'POST',
+        url: `/api/projects/${quotaProjectId}/runs`,
+        headers: quotaHeaders,
+        payload: { useRunner: true, stepBudget: 3 },
+      });
+      expect(run.statusCode).toBe(201);
+      expect(run.json().data.run.mode).toBe('cli');
+
+      const me = await app.inject({ method: 'GET', url: '/api/auth/me', headers: quotaHeaders });
+      expect(me.json().data.user.quota).toBe(0); // 未被扣减
+    });
+
+    it('管理员可给用户加额度,加完立即可用', async () => {
+      const patch = await app.inject({
+        method: 'PATCH',
+        url: `/api/admin/users/${quotaUserId}`,
+        headers: adminHeaders,
+        payload: { quota: 5 },
+      });
+      expect(patch.statusCode).toBe(200);
+      expect(patch.json().data.user.quota).toBe(5);
+
+      const run = await app.inject({
+        method: 'POST',
+        url: `/api/projects/${quotaProjectId}/runs`,
+        headers: quotaHeaders,
+        payload: { stepBudget: 3 },
+      });
+      expect(run.statusCode).toBe(201);
     });
   });
 

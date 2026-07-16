@@ -17,8 +17,7 @@ export default function ProjectDetail() {
   const [tab, setTab] = useState<'runs' | 'issues'>('runs');
   const [goal, setGoal] = useState('');
   const [steps, setSteps] = useState('30');
-  const [mode, setMode] = useState<'heuristic' | 'ai' | 'cli'>('heuristic');
-  const [executor, setExecutor] = useState<'cloud' | 'runner'>('cloud');
+  const [useRunner, setUseRunner] = useState(false);
   const [error, setError] = useState('');
   const [launching, setLaunching] = useState(false);
 
@@ -44,10 +43,9 @@ export default function ProjectDetail() {
     setError('');
     try {
       const run = await api.createRun(id, {
-        mode,
-        executor,
         goal: goal.trim() || undefined,
         stepBudget: Number(steps) || 30,
+        useRunner,
       });
       navigate(`/console/runs/${run.id}`);
     } catch (err) {
@@ -58,7 +56,7 @@ export default function ProjectDetail() {
 
   return (
     <ConsoleShell>
-      {() => (
+      {(me) => (
         <div>
           <BackLink to="/console">我的项目</BackLink>
           <div className="mt-2 flex flex-wrap items-baseline gap-3">
@@ -73,8 +71,17 @@ export default function ProjectDetail() {
             onSubmit={onLaunch}
             className="mt-6 rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm"
           >
-            <h2 className="font-bold">发起探索</h2>
-            <div className="mt-4 grid gap-4 sm:grid-cols-[2fr_1fr_1fr_1fr_auto]">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-bold">发起 AI 探索</h2>
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  me.quota > 0 ? 'bg-indigo-50 text-indigo-600' : 'bg-rose-50 text-rose-500'
+                }`}
+              >
+                剩余额度 {me.quota} 次
+              </span>
+            </div>
+            <div className="mt-4 grid gap-4 sm:grid-cols-[3fr_1fr_auto]">
               <TextInput
                 label="探索目标(可选)"
                 placeholder="比如:重点测试注册与下单流程"
@@ -92,54 +99,30 @@ export default function ProjectDetail() {
                   className="input-glow w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm outline-none"
                 />
               </label>
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-slate-600">模式</span>
-                <select
-                  value={mode}
-                  onChange={(e) => setMode(e.target.value as 'heuristic' | 'ai' | 'cli')}
-                  className="input-glow w-full cursor-pointer rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm outline-none"
-                >
-                  <option value="heuristic">启发式(免费冒烟)</option>
-                  <option value="ai">AI 探索(平台模型)</option>
-                  <option value="cli">AI·本地 CLI(Claude Code)</option>
-                </select>
-              </label>
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-slate-600">执行位置</span>
-                <select
-                  value={executor}
-                  onChange={(e) => setExecutor(e.target.value as 'cloud' | 'runner')}
-                  className="input-glow w-full cursor-pointer rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm outline-none"
-                >
-                  <option value="cloud">平台执行</option>
-                  <option value="runner">本机 Runner</option>
-                </select>
-              </label>
               <div className="flex items-end">
                 <GradientButton type="submit" disabled={launching} className="inline-flex items-center gap-1.5 !py-3 text-sm">
                   {launching ? '排队中…' : <>开测 <IconArrowRight className="h-4 w-4" /></>}
                 </GradientButton>
               </div>
             </div>
+            {me.runnerEnabled && (
+              <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={useRunner}
+                  onChange={(e) => setUseRunner(e.target.checked)}
+                  className="h-4 w-4 accent-indigo-500"
+                />
+                用本机 Runner 执行(Claude CLI 供能,不消耗额度,可测内网/localhost)
+              </label>
+            )}
             {error && (
               <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm font-medium text-rose-600">{error}</p>
             )}
             <p className="mt-3 text-xs text-slate-400">
-              {mode === 'heuristic' &&
-                '启发式:零成本爬行,会优先点击与目标相关的链接和按钮,但不会填写表单;要完整走注册/下单等流程请用 AI 模式。'}
-              {mode === 'ai' &&
-                'AI 探索:多模态模型像真实用户一样操作,可填表单、走完整业务流程;由平台内置模型供能,无需任何配置。'}
-              {mode === 'cli' &&
-                'AI·本地 CLI:用执行机器上的 Claude Code 订阅做决策,零 API 费用,可填表单走完整流程;每步约 5~15 秒。'}
-              {executor === 'runner' &&
-                ' · 本机 Runner:任务由你电脑上的 runner 领取执行(可测内网/localhost),需先在「设置」创建 Token 并启动 runner。'}
-              {executor === 'cloud' && ' · 平台执行:任务在平台服务器上运行,适合测公网站点。'}
-              {mode === 'cli' && executor === 'cloud' && (
-                <span className="font-semibold text-amber-600">
-                  {' '}
-                  注意:CLI 模式在「平台执行」要求平台服务器装有 Claude CLI(自托管部署适用);一般请选「本机 Runner」。
-                </span>
-              )}
+              {useRunner
+                ? '任务将由你电脑上的 runner 领取执行,结果自动回传平台;需确保 runner 正在运行(设置页有启动命令)。'
+                : 'AI 像真实用户一样点击、填表单、走完整业务流程,自动发现缺陷并生成带截图的报告;每次探索消耗 1 次额度。'}
             </p>
           </motion.form>
 

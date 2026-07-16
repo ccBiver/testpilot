@@ -5,6 +5,8 @@ export interface ApiUser {
   email: string;
   role: string;
   runnerEnabled: boolean;
+  /** 剩余 AI 探索额度(平台执行消耗;Runner 执行不消耗) */
+  quota: number;
   createdAt: string;
 }
 
@@ -197,6 +199,7 @@ export interface ApiAdminUser {
   role: string;
   status: 'active' | 'disabled';
   runnerEnabled: boolean;
+  quota: number;
   createdAt: string;
   projectCount: number;
   runCount: number;
@@ -264,7 +267,7 @@ export const api = {
 
   createRun: (
     projectId: string,
-    input: { mode: string; executor?: string; goal?: string; stepBudget: number },
+    input: { goal?: string; stepBudget: number; useRunner?: boolean },
   ) =>
     request<{ run: ApiRun }>(`/api/projects/${projectId}/runs`, {
       method: 'POST',
@@ -321,10 +324,22 @@ export const api = {
 
   adminUsers: () => request<{ users: ApiAdminUser[] }>('/api/admin/users').then((d) => d.users),
 
-  adminPatchUser: (id: string, patch: { status?: 'active' | 'disabled'; runnerEnabled?: boolean }) =>
-    request<{ user: { id: string; status: string; runnerEnabled: boolean } }>(`/api/admin/users/${id}`, {
-      method: 'PATCH',
-      body: patch,
+  adminPatchUser: (
+    id: string,
+    patch: { status?: 'active' | 'disabled'; runnerEnabled?: boolean; quota?: number },
+  ) =>
+    request<{ user: { id: string; status: string; runnerEnabled: boolean; quota: number } }>(
+      `/api/admin/users/${id}`,
+      { method: 'PATCH', body: patch },
+    ),
+
+  adminGetQuota: () =>
+    request<{ defaultFreeRuns: number }>('/api/admin/quota').then((d) => d.defaultFreeRuns),
+
+  adminSetQuota: (defaultFreeRuns: number) =>
+    request<{ defaultFreeRuns: number }>('/api/admin/quota', {
+      method: 'PUT',
+      body: { defaultFreeRuns },
     }),
 
   adminRuns: () => request<{ runs: ApiAdminRun[] }>('/api/admin/runs').then((d) => d.runs),

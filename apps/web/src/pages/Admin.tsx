@@ -69,7 +69,7 @@ export default function Admin() {
 
   const patchUser = async (
     u: ApiAdminUser,
-    patch: { status?: 'active' | 'disabled'; runnerEnabled?: boolean },
+    patch: { status?: 'active' | 'disabled'; runnerEnabled?: boolean; quota?: number },
     confirmText?: string,
   ) => {
     if (confirmText && !window.confirm(confirmText)) return;
@@ -97,6 +97,17 @@ export default function Admin() {
       { runnerEnabled: !u.runnerEnabled },
       u.runnerEnabled ? `确定回收 ${u.email} 的 Runner 权限?其已连接的 runner 将立即失效。` : undefined,
     );
+
+  const editQuota = (u: ApiAdminUser) => {
+    const input = window.prompt(`设置 ${u.email} 的剩余额度(当前 ${u.quota} 次):`, String(u.quota));
+    if (input === null) return;
+    const value = Number(input);
+    if (!Number.isInteger(value) || value < 0) {
+      setError('额度必须是非负整数');
+      return;
+    }
+    void patchUser(u, { quota: value });
+  };
 
   return (
     <ConsoleShell>
@@ -134,6 +145,7 @@ export default function Admin() {
                     <th className="px-4 py-3 font-medium">角色</th>
                     <th className="px-4 py-3 font-medium">状态</th>
                     <th className="px-4 py-3 font-medium">Runner</th>
+                    <th className="px-4 py-3 font-medium">额度</th>
                     <th className="px-4 py-3 font-medium">项目</th>
                     <th className="px-4 py-3 font-medium">运行</th>
                     <th className="px-4 py-3 font-medium">注册时间</th>
@@ -173,6 +185,16 @@ export default function Admin() {
                           title={u.runnerEnabled ? '点击回收 Runner 权限' : '点击开通 Runner 权限'}
                         >
                           {u.runnerEnabled ? '已开通' : '未开通'}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => editQuota(u)}
+                          disabled={busyUserId === u.id}
+                          className="cursor-pointer rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-indigo-50 hover:text-indigo-600 disabled:opacity-50"
+                          title="点击修改额度"
+                        >
+                          {u.quota} 次
                         </button>
                       </td>
                       <td className="px-4 py-3 text-slate-500">{u.projectCount}</td>

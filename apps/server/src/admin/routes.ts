@@ -3,9 +3,11 @@ import { z } from 'zod';
 import type { PrismaClient } from '@prisma/client';
 import type { ServerConfig } from '../config.js';
 import {
+  getDefaultFreeRuns,
   getPlatformModelPublic,
   isRegistrationEnabled,
   savePlatformModelConfig,
+  setDefaultFreeRuns,
   setRegistrationEnabled,
 } from '../platform/config.js';
 
@@ -13,10 +15,15 @@ const userPatchSchema = z
   .object({
     status: z.enum(['active', 'disabled'], { message: '状态只能是 active 或 disabled' }).optional(),
     runnerEnabled: z.boolean().optional(),
+    quota: z.number().int().min(0, '额度不能为负').max(1_000_000).optional(),
   })
-  .refine((v) => v.status !== undefined || v.runnerEnabled !== undefined, {
+  .refine((v) => v.status !== undefined || v.runnerEnabled !== undefined || v.quota !== undefined, {
     message: '至少提供一个要修改的字段',
   });
+
+const quotaSchema = z.object({
+  defaultFreeRuns: z.number().int().min(0, '额度不能为负').max(1_000_000),
+});
 
 const modelConfigSchema = z.object({
   apiKey: z.string().trim().min(8, 'API Key 太短').max(256, 'API Key 过长').optional(),
@@ -82,6 +89,7 @@ export function registerAdminRoutes(
           role: u.role,
           status: u.status,
           runnerEnabled: u.runnerEnabled,
+          quota: u.quota,
           createdAt: u.createdAt.toISOString(),
           projectCount: u._count.projects,
           runCount: u._count.runs,
@@ -104,6 +112,7 @@ export function registerAdminRoutes(
       data: {
         ...(patch.status !== undefined ? { status: patch.status } : {}),
         ...(patch.runnerEnabled !== undefined ? { runnerEnabled: patch.runnerEnabled } : {}),
+        ...(patch.quota !== undefined ? { quota: patch.quota } : {}),
       },
     });
     return reply.send({
@@ -114,9 +123,21 @@ export function registerAdminRoutes(
           email: updated.email,
           status: updated.status,
           runnerEnabled: updated.runnerEnabled,
+          quota: updated.quota,
         },
       },
     });
+  });
+
+  // 新用户默认免费额度
+  app.get('/api/admin/quota', pre, async (_req, reply) => {
+    return reply.send({ ok: true, data: { defaultFreeRuns: await getDefaultFreeRuns(prisma) } });
+  });
+
+  app.put('/api/admin/quota', pre, async (req, reply) => {
+    const { defaultFreeRuns } = quotaSchema.parse(req.body);
+    await setDefaultFreeRuns(prisma, defaultFreeRuns);
+    return reply.send({ ok: true, data: { defaultFreeRuns } });
   });
 
   // 平台模型配置(所有用户的 AI 探索统一由平台供给)

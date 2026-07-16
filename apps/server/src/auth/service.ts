@@ -2,13 +2,14 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import type { PrismaClient, User } from '@prisma/client';
 import type { ServerConfig } from '../config.js';
-import { isRegistrationEnabled } from '../platform/config.js';
+import { getDefaultFreeRuns, isRegistrationEnabled } from '../platform/config.js';
 
 export interface PublicUser {
   id: string;
   email: string;
   role: string;
   runnerEnabled: boolean;
+  quota: number;
   createdAt: string;
 }
 
@@ -39,6 +40,7 @@ export function toPublicUser(user: User): PublicUser {
     email: user.email,
     role: user.role,
     runnerEnabled: user.runnerEnabled,
+    quota: user.quota,
     createdAt: user.createdAt.toISOString(),
   };
 }
@@ -66,6 +68,7 @@ export class AuthService {
         email: normalizedEmail,
         passwordHash,
         role: userCountBefore === 0 ? 'admin' : 'user',
+        quota: await getDefaultFreeRuns(this.prisma),
       },
     });
     return { user: toPublicUser(user), ...this.issueTokens(user) };
