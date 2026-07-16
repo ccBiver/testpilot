@@ -180,6 +180,38 @@ export interface ApiModelConfig {
   updatedAt: string;
 }
 
+export interface ApiAdminStats {
+  users: number;
+  activeUsers: number;
+  projects: number;
+  runsTotal: number;
+  runsActive: number;
+  issuesOpen: number;
+  issuesTotal: number;
+}
+
+export interface ApiAdminUser {
+  id: string;
+  email: string;
+  role: string;
+  status: 'active' | 'disabled';
+  createdAt: string;
+  projectCount: number;
+  runCount: number;
+}
+
+export interface ApiAdminRun {
+  id: string;
+  userEmail: string;
+  projectName: string;
+  mode: string;
+  executor: string;
+  status: 'queued' | 'running' | 'done' | 'failed';
+  findingsCount: number;
+  stepsTaken: number;
+  createdAt: string;
+}
+
 export const api = {
   async register(email: string, password: string): Promise<ApiUser> {
     const data = await request<AuthResult>('/api/auth/register', {
@@ -279,6 +311,18 @@ export const api = {
 
   deleteRunnerToken: (id: string) =>
     request<{ deleted: boolean }>(`/api/settings/runner-tokens/${id}`, { method: 'DELETE' }),
+
+  adminStats: () => request<{ stats: ApiAdminStats }>('/api/admin/stats').then((d) => d.stats),
+
+  adminUsers: () => request<{ users: ApiAdminUser[] }>('/api/admin/users').then((d) => d.users),
+
+  adminSetUserStatus: (id: string, status: 'active' | 'disabled') =>
+    request<{ user: { id: string; status: string } }>(`/api/admin/users/${id}`, {
+      method: 'PATCH',
+      body: { status },
+    }),
+
+  adminRuns: () => request<{ runs: ApiAdminRun[] }>('/api/admin/runs').then((d) => d.runs),
 
   /** 截图需带鉴权,取回 blob URL(调用方负责 revoke) */
   async fetchArtifact(runId: string, screenshotFile: string): Promise<string> {

@@ -13,6 +13,7 @@ import { registerIssueRoutes } from './issues/routes.js';
 import { registerSettingsRoutes } from './settings/routes.js';
 import { registerRunnerTokenRoutes } from './settings/runner-tokens.js';
 import { registerRunnerGatewayRoutes } from './runner-gateway/routes.js';
+import { registerAdminRoutes } from './admin/routes.js';
 import { RunQueue } from './runs/runner.js';
 
 /** 组装 Fastify 应用(与监听分离,测试用 app.inject 直连) */
@@ -54,6 +55,7 @@ export async function buildApp(config: ServerConfig, prisma: PrismaClient): Prom
   registerSettingsRoutes(app, prisma, config, requireAuth);
   registerRunnerTokenRoutes(app, prisma, requireAuth);
   registerRunnerGatewayRoutes(app, prisma, queue, config);
+  registerAdminRoutes(app, prisma, requireAuth);
 
   return app;
 }

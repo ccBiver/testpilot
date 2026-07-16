@@ -1,5 +1,4 @@
 import { Route, Routes } from 'react-router-dom';
-import ConsoleShell from './components/ConsoleShell';
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
 import Console from './pages/Console';
@@ -7,7 +6,7 @@ import ProjectDetail from './pages/ProjectDetail';
 import RunDetail from './pages/RunDetail';
 import IssueDetail from './pages/IssueDetail';
 import Settings from './pages/Settings';
-import Placeholder from './pages/Placeholder';
+import Admin from './pages/Admin';
 
 export default function App() {
   return (
@@ -20,14 +19,7 @@ export default function App() {
       <Route path="/console/runs/:id" element={<RunDetail />} />
       <Route path="/console/issues/:id" element={<IssueDetail />} />
       <Route path="/console/settings" element={<Settings />} />
-      <Route
-        path="/admin"
-        element={
-          <ConsoleShell>
-            {() => <Placeholder title="管理后台" hint="用户管理、运行监控与模型配置即将上线。" embedded />}
-          </ConsoleShell>
-        }
-      />
+      <Route path="/admin" element={<Admin />} />
     </Routes>
   );
 }
