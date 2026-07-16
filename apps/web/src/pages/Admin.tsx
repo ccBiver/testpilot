@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ConsoleShell from '../components/ConsoleShell';
+import PlatformSettingsSection from '../components/PlatformSettingsSection';
 import { RunStatusBadge } from '../components/RunStatus';
 import {
   api,
@@ -14,7 +15,7 @@ import {
 
 const MODE_LABELS: Record<string, string> = {
   heuristic: '启发式',
-  ai: 'AI·Key',
+  ai: 'AI·平台模型',
   cli: 'AI·CLI',
 };
 
@@ -66,12 +67,15 @@ export default function Admin() {
     void load();
   }, [load]);
 
-  const toggleUser = async (u: ApiAdminUser) => {
-    const next = u.status === 'active' ? 'disabled' : 'active';
-    if (next === 'disabled' && !window.confirm(`确定禁用 ${u.email}?其登录与任务将立即失效。`)) return;
+  const patchUser = async (
+    u: ApiAdminUser,
+    patch: { status?: 'active' | 'disabled'; runnerEnabled?: boolean },
+    confirmText?: string,
+  ) => {
+    if (confirmText && !window.confirm(confirmText)) return;
     setBusyUserId(u.id);
     try {
-      await api.adminSetUserStatus(u.id, next);
+      await api.adminPatchUser(u.id, patch);
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '操作失败');
@@ -79,6 +83,20 @@ export default function Admin() {
       setBusyUserId('');
     }
   };
+
+  const toggleStatus = (u: ApiAdminUser) =>
+    patchUser(
+      u,
+      { status: u.status === 'active' ? 'disabled' : 'active' },
+      u.status === 'active' ? `确定禁用 ${u.email}?其登录与任务将立即失效。` : undefined,
+    );
+
+  const toggleRunner = (u: ApiAdminUser) =>
+    patchUser(
+      u,
+      { runnerEnabled: !u.runnerEnabled },
+      u.runnerEnabled ? `确定回收 ${u.email} 的 Runner 权限?其已连接的 runner 将立即失效。` : undefined,
+    );
 
   return (
     <ConsoleShell>
@@ -104,6 +122,9 @@ export default function Admin() {
               </div>
             )}
 
+            <h2 className="mt-10 text-lg font-bold">平台设置</h2>
+            <PlatformSettingsSection />
+
             <h2 className="mt-10 text-lg font-bold">用户管理({users.length})</h2>
             <div className="mt-3 overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-sm">
               <table className="w-full min-w-[640px] text-sm">
@@ -112,6 +133,7 @@ export default function Admin() {
                     <th className="px-4 py-3 font-medium">邮箱</th>
                     <th className="px-4 py-3 font-medium">角色</th>
                     <th className="px-4 py-3 font-medium">状态</th>
+                    <th className="px-4 py-3 font-medium">Runner</th>
                     <th className="px-4 py-3 font-medium">项目</th>
                     <th className="px-4 py-3 font-medium">运行</th>
                     <th className="px-4 py-3 font-medium">注册时间</th>
@@ -139,6 +161,20 @@ export default function Admin() {
                           {u.status === 'active' ? '正常' : '已禁用'}
                         </span>
                       </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => toggleRunner(u)}
+                          disabled={busyUserId === u.id}
+                          className={`cursor-pointer rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                            u.runnerEnabled
+                              ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                              : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                          }`}
+                          title={u.runnerEnabled ? '点击回收 Runner 权限' : '点击开通 Runner 权限'}
+                        >
+                          {u.runnerEnabled ? '已开通' : '未开通'}
+                        </button>
+                      </td>
                       <td className="px-4 py-3 text-slate-500">{u.projectCount}</td>
                       <td className="px-4 py-3 text-slate-500">{u.runCount}</td>
                       <td className="px-4 py-3 text-xs text-slate-400">
@@ -147,7 +183,7 @@ export default function Admin() {
                       <td className="px-4 py-3">
                         {u.id !== me.id && (
                           <button
-                            onClick={() => toggleUser(u)}
+                            onClick={() => toggleStatus(u)}
                             disabled={busyUserId === u.id}
                             className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-50 ${
                               u.status === 'active'

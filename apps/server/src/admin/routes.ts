@@ -1,10 +1,31 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandler } from 'fastify';
 import { z } from 'zod';
 import type { PrismaClient } from '@prisma/client';
+import type { ServerConfig } from '../config.js';
+import {
+  getPlatformModelPublic,
+  isRegistrationEnabled,
+  savePlatformModelConfig,
+  setRegistrationEnabled,
+} from '../platform/config.js';
 
-const userStatusSchema = z.object({
-  status: z.enum(['active', 'disabled'], { message: '状态只能是 active 或 disabled' }),
+const userPatchSchema = z
+  .object({
+    status: z.enum(['active', 'disabled'], { message: '状态只能是 active 或 disabled' }).optional(),
+    runnerEnabled: z.boolean().optional(),
+  })
+  .refine((v) => v.status !== undefined || v.runnerEnabled !== undefined, {
+    message: '至少提供一个要修改的字段',
+  });
+
+const modelConfigSchema = z.object({
+  apiKey: z.string().trim().min(8, 'API Key 太短').max(256, 'API Key 过长').optional(),
+  baseUrl: z.string().trim().url('接口地址必须是合法 URL'),
+  modelName: z.string().trim().min(1, '请填写模型名称').max(100),
+  vlMode: z.enum(['none', 'qwen']).default('none'),
 });
+
+const registrationSchema = z.object({ enabled: z.boolean() });
 
 const idParamSchema = z.object({ id: z.string().min(1) });
 
@@ -21,6 +42,7 @@ function makeRequireAdmin(prisma: PrismaClient) {
 export function registerAdminRoutes(
   app: FastifyInstance,
   prisma: PrismaClient,
+  config: ServerConfig,
   requireAuth: preHandlerHookHandler,
 ): void {
   const pre = { preHandler: [requireAuth, makeRequireAdmin(prisma)] };
@@ -59,6 +81,7 @@ export function registerAdminRoutes(
           email: u.email,
           role: u.role,
           status: u.status,
+          runnerEnabled: u.runnerEnabled,
           createdAt: u.createdAt.toISOString(),
           projectCount: u._count.projects,
           runCount: u._count.runs,
@@ -67,20 +90,61 @@ export function registerAdminRoutes(
     });
   });
 
-  // 禁用/启用用户(不能操作自己;被禁用户的 token 在各守卫处按库中状态实时失效)
+  // 修改用户:禁用/启用、开通/回收 Runner 权限(不能操作自己的状态)
   app.patch('/api/admin/users/:id', pre, async (req, reply) => {
     const { id } = idParamSchema.parse(req.params);
-    const { status } = userStatusSchema.parse(req.body);
-    if (id === req.authUser!.sub) {
+    const patch = userPatchSchema.parse(req.body);
+    if (patch.status !== undefined && id === req.authUser!.sub) {
       return reply.code(400).send({ ok: false, error: '不能修改自己的账号状态' });
     }
     const target = await prisma.user.findUnique({ where: { id } });
     if (!target) return reply.code(404).send({ ok: false, error: '用户不存在' });
-    const updated = await prisma.user.update({ where: { id }, data: { status } });
+    const updated = await prisma.user.update({
+      where: { id },
+      data: {
+        ...(patch.status !== undefined ? { status: patch.status } : {}),
+        ...(patch.runnerEnabled !== undefined ? { runnerEnabled: patch.runnerEnabled } : {}),
+      },
+    });
     return reply.send({
       ok: true,
-      data: { user: { id: updated.id, email: updated.email, status: updated.status } },
+      data: {
+        user: {
+          id: updated.id,
+          email: updated.email,
+          status: updated.status,
+          runnerEnabled: updated.runnerEnabled,
+        },
+      },
     });
+  });
+
+  // 平台模型配置(所有用户的 AI 探索统一由平台供给)
+  app.get('/api/admin/model-config', pre, async (_req, reply) => {
+    const model = await getPlatformModelPublic(prisma);
+    return reply.send({ ok: true, data: { model } });
+  });
+
+  app.put('/api/admin/model-config', pre, async (req, reply) => {
+    const body = modelConfigSchema.parse(req.body);
+    const existing = await getPlatformModelPublic(prisma);
+    if (!existing?.hasApiKey && !body.apiKey) {
+      return reply.code(400).send({ ok: false, error: '首次配置必须填写 API Key' });
+    }
+    await savePlatformModelConfig(prisma, config.jwtSecret, body);
+    const model = await getPlatformModelPublic(prisma);
+    return reply.send({ ok: true, data: { model } });
+  });
+
+  // 注册开关
+  app.get('/api/admin/registration', pre, async (_req, reply) => {
+    return reply.send({ ok: true, data: { enabled: await isRegistrationEnabled(prisma) } });
+  });
+
+  app.put('/api/admin/registration', pre, async (req, reply) => {
+    const { enabled } = registrationSchema.parse(req.body);
+    await setRegistrationEnabled(prisma, enabled);
+    return reply.send({ ok: true, data: { enabled } });
   });
 
   // 全局最近运行(监控视角,跨用户)

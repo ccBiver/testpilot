@@ -7,7 +7,7 @@ import type { PrismaClient, RunnerToken } from '@prisma/client';
 import type { RunReport } from '@testpilot/shared';
 import type { ServerConfig } from '../config.js';
 import { upsertIssuesFromRun } from '../issues/service.js';
-import { loadUserModelConfig } from '../settings/routes.js';
+import { loadPlatformModelConfig } from '../platform/config.js';
 import type { RunQueue } from '../runs/runner.js';
 
 export function hashRunnerToken(token: string): string {
@@ -55,9 +55,17 @@ export function registerRunnerGatewayRoutes(
       await reply.code(401).send({ ok: false, error: '缺少或非法的 Runner Token' });
       return null;
     }
-    const row = await prisma.runnerToken.findUnique({ where: { tokenHash: hashRunnerToken(token) } });
+    const row = await prisma.runnerToken.findUnique({
+      where: { tokenHash: hashRunnerToken(token) },
+      include: { user: { select: { status: true, runnerEnabled: true } } },
+    });
     if (!row) {
       await reply.code(401).send({ ok: false, error: 'Runner Token 无效或已被删除' });
+      return null;
+    }
+    // Runner 是管理员开通的能力:权限被回收或账号被禁用时,已有 Token 立即失效
+    if (row.user.status !== 'active' || !row.user.runnerEnabled) {
+      await reply.code(403).send({ ok: false, error: 'Runner 权限未开通或已被停用,请联系管理员' });
       return null;
     }
     await prisma.runnerToken.update({ where: { id: row.id }, data: { lastSeenAt: new Date() } });
@@ -83,9 +91,9 @@ export function registerRunnerGatewayRoutes(
     });
     if (claimed.count === 0) return reply.send({ ok: true, data: { run: null } });
 
-    // ai 模式把用户 BYOK 解密下发给本人的 runner(HTTPS 部署;本机开发为回环)
+    // ai 模式把平台模型配置解密下发给已授权用户的 runner(HTTPS 部署;本机开发为回环)
     const modelConfig =
-      run.mode === 'ai' ? await loadUserModelConfig(prisma, config.jwtSecret, token.userId) : null;
+      run.mode === 'ai' ? await loadPlatformModelConfig(prisma, config.jwtSecret) : null;
 
     return reply.send({
       ok: true,

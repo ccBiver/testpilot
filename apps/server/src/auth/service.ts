@@ -2,11 +2,13 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import type { PrismaClient, User } from '@prisma/client';
 import type { ServerConfig } from '../config.js';
+import { isRegistrationEnabled } from '../platform/config.js';
 
 export interface PublicUser {
   id: string;
   email: string;
   role: string;
+  runnerEnabled: boolean;
   createdAt: string;
 }
 
@@ -36,6 +38,7 @@ export function toPublicUser(user: User): PublicUser {
     id: user.id,
     email: user.email,
     role: user.role,
+    runnerEnabled: user.runnerEnabled,
     createdAt: user.createdAt.toISOString(),
   };
 }
@@ -46,19 +49,23 @@ export class AuthService {
     private readonly config: ServerConfig,
   ) {}
 
-  /** 注册:邮箱唯一;第一个注册的用户自动成为 admin */
+  /** 注册:邮箱唯一;第一个注册的用户自动成为 admin;受平台注册开关控制 */
   async register(email: string, password: string): Promise<{ user: PublicUser } & TokenPair> {
+    const userCountBefore = await this.prisma.user.count();
+    // 首个用户(平台初始化)不受开关限制
+    if (userCountBefore > 0 && !(await isRegistrationEnabled(this.prisma))) {
+      throw new AuthError(403, '注册暂未开放,请联系管理员');
+    }
     const normalizedEmail = email.trim().toLowerCase();
     const existing = await this.prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existing) throw new AuthError(409, '该邮箱已被注册');
 
-    const userCount = await this.prisma.user.count();
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await this.prisma.user.create({
       data: {
         email: normalizedEmail,
         passwordHash,
-        role: userCount === 0 ? 'admin' : 'user',
+        role: userCountBefore === 0 ? 'admin' : 'user',
       },
     });
     return { user: toPublicUser(user), ...this.issueTokens(user) };

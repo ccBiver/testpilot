@@ -4,6 +4,7 @@ export interface ApiUser {
   id: string;
   email: string;
   role: string;
+  runnerEnabled: boolean;
   createdAt: string;
 }
 
@@ -172,12 +173,12 @@ export interface ApiIssue {
   finding: ApiFinding | null;
 }
 
-export interface ApiModelConfig {
+/** 平台模型配置(仅管理员可见;Key 永不回传) */
+export interface ApiPlatformModel {
   baseUrl: string;
   modelName: string;
-  vlMode: 'none' | 'qwen';
-  apiKeyMasked: string;
-  updatedAt: string;
+  vlMode: string;
+  hasApiKey: boolean;
 }
 
 export interface ApiAdminStats {
@@ -195,6 +196,7 @@ export interface ApiAdminUser {
   email: string;
   role: string;
   status: 'active' | 'disabled';
+  runnerEnabled: boolean;
   createdAt: string;
   projectCount: number;
   runCount: number;
@@ -289,16 +291,19 @@ export const api = {
       body: { status },
     }).then((d) => d.issue),
 
-  getModelConfig: () =>
-    request<{ config: ApiModelConfig | null }>('/api/settings/model').then((d) => d.config),
+  adminGetModelConfig: () =>
+    request<{ model: ApiPlatformModel | null }>('/api/admin/model-config').then((d) => d.model),
 
-  saveModelConfig: (input: { apiKey?: string; baseUrl: string; modelName: string; vlMode: string }) =>
-    request<{ config: ApiModelConfig }>('/api/settings/model', { method: 'PUT', body: input }).then(
-      (d) => d.config,
+  adminSaveModelConfig: (input: { apiKey?: string; baseUrl: string; modelName: string; vlMode: string }) =>
+    request<{ model: ApiPlatformModel }>('/api/admin/model-config', { method: 'PUT', body: input }).then(
+      (d) => d.model,
     ),
 
-  clearModelConfig: () =>
-    request<{ deleted: boolean }>('/api/settings/model', { method: 'DELETE' }),
+  adminGetRegistration: () =>
+    request<{ enabled: boolean }>('/api/admin/registration').then((d) => d.enabled),
+
+  adminSetRegistration: (enabled: boolean) =>
+    request<{ enabled: boolean }>('/api/admin/registration', { method: 'PUT', body: { enabled } }),
 
   listRunnerTokens: () =>
     request<{ tokens: ApiRunnerToken[] }>('/api/settings/runner-tokens').then((d) => d.tokens),
@@ -316,10 +321,10 @@ export const api = {
 
   adminUsers: () => request<{ users: ApiAdminUser[] }>('/api/admin/users').then((d) => d.users),
 
-  adminSetUserStatus: (id: string, status: 'active' | 'disabled') =>
-    request<{ user: { id: string; status: string } }>(`/api/admin/users/${id}`, {
+  adminPatchUser: (id: string, patch: { status?: 'active' | 'disabled'; runnerEnabled?: boolean }) =>
+    request<{ user: { id: string; status: string; runnerEnabled: boolean } }>(`/api/admin/users/${id}`, {
       method: 'PATCH',
-      body: { status },
+      body: patch,
     }),
 
   adminRuns: () => request<{ runs: ApiAdminRun[] }>('/api/admin/runs').then((d) => d.runs),

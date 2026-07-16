@@ -72,6 +72,8 @@ describe('Runner 网关端到端', () => {
     });
     accessToken = reg.json().data.accessToken;
     authed.authorization = `Bearer ${accessToken}`;
+    // Runner 是管理员开通的能力,测试里直接打开两位用户的开关
+    await prisma.user.updateMany({ data: { runnerEnabled: true } });
     const proj = await app.inject({
       method: 'POST',
       url: '/api/projects',
@@ -94,6 +96,10 @@ describe('Runner 网关端到端', () => {
       method: 'POST',
       url: '/api/auth/register',
       payload: { email: 'other@testpilot.dev', password: 'password123' },
+    });
+    await prisma.user.update({
+      where: { id: regB.json().data.user.id },
+      data: { runnerEnabled: true },
     });
     const tokB = await app.inject({
       method: 'POST',

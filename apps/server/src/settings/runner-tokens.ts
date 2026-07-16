@@ -31,6 +31,10 @@ export function registerRunnerTokenRoutes(
   });
 
   app.post('/api/settings/runner-tokens', { preHandler: requireAuth }, async (req, reply) => {
+    const me = await prisma.user.findUnique({ where: { id: req.authUser!.sub } });
+    if (!me?.runnerEnabled) {
+      return reply.code(403).send({ ok: false, error: 'Runner 权限未开通,请联系管理员' });
+    }
     const body = createSchema.parse(req.body);
     const plaintext = generateRunnerToken();
     const row = await prisma.runnerToken.create({

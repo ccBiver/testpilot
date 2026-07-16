@@ -3,8 +3,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { api, ApiError, type ApiRunnerToken } from '../lib/api';
 import { DotLoader, GradientButton, TextInput } from './Ui';
 
-/** 设置页的 Runner Token 管理:创建(明文只显示一次)、列表、删除 */
-export default function RunnerTokenSection() {
+/** 设置页的 Runner Token 管理:创建(明文只显示一次)、列表、删除;能力由管理员开通 */
+export default function RunnerTokenSection({ enabled }: { enabled: boolean }) {
   const [tokens, setTokens] = useState<ApiRunnerToken[]>([]);
   const [name, setName] = useState('');
   const [freshToken, setFreshToken] = useState<string | null>(null);
@@ -14,8 +14,25 @@ export default function RunnerTokenSection() {
 
   const reload = () => api.listRunnerTokens().then(setTokens).catch(() => {});
   useEffect(() => {
-    void reload();
-  }, []);
+    if (enabled) void reload();
+  }, [enabled]);
+
+  if (!enabled) {
+    return (
+      <motion.section
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="mt-6 max-w-xl rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-6"
+      >
+        <h2 className="font-bold text-slate-500">本机 Runner(未开通)</h2>
+        <p className="mt-2 text-xs leading-relaxed text-slate-400">
+          Runner 可以在你自己的电脑上执行测试任务:用本机的 Claude Code 订阅跑 AI 探索、
+          测试内网/localhost 站点。该能力需管理员开通,如有需要请联系管理员。
+        </p>
+      </motion.section>
+    );
+  }
 
   const onCreate = async (e: FormEvent) => {
     e.preventDefault();

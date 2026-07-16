@@ -17,13 +17,21 @@ model User {
   role         String    @default("user")
   // active | disabled
   status       String    @default("active")
+  // 自托管 Runner 权限,由管理员开通(商业化能力开关)
+  runnerEnabled Boolean  @default(false)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   projects     Project[]
   runs         Run[]
   issues       Issue[]
-  modelConfig  ModelConfig?
   runnerTokens RunnerToken[]
+}
+
+// 平台级配置键值(模型配置/注册开关等),敏感值加密存储
+model SystemConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }
 
 // 自托管 Runner 的接入凭证:明文只在创建时返回一次,库里只存 sha256
@@ -37,20 +45,6 @@ model RunnerToken {
   createdAt  DateTime  @default(now())
 
   @@index([userId])
-}
-
-// 用户自带模型 Key(BYOK):apiKey 用 AES-256-GCM 加密落库,永不明文返回
-model ModelConfig {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  baseUrl   String
-  modelName String
-  apiKeyEnc String
-  // none | qwen(Qwen-VL 坐标兼容模式)
-  vlMode    String   @default("none")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 model Project {

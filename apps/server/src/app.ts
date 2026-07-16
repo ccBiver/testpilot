@@ -10,7 +10,6 @@ import { makeRequireAuth, registerAuthRoutes } from './auth/routes.js';
 import { registerProjectRoutes } from './projects/routes.js';
 import { registerRunRoutes } from './runs/routes.js';
 import { registerIssueRoutes } from './issues/routes.js';
-import { registerSettingsRoutes } from './settings/routes.js';
 import { registerRunnerTokenRoutes } from './settings/runner-tokens.js';
 import { registerRunnerGatewayRoutes } from './runner-gateway/routes.js';
 import { registerAdminRoutes } from './admin/routes.js';
@@ -52,10 +51,9 @@ export async function buildApp(config: ServerConfig, prisma: PrismaClient): Prom
   registerProjectRoutes(app, prisma, requireAuth);
   registerRunRoutes(app, prisma, queue, requireAuth);
   registerIssueRoutes(app, prisma, requireAuth);
-  registerSettingsRoutes(app, prisma, config, requireAuth);
   registerRunnerTokenRoutes(app, prisma, requireAuth);
   registerRunnerGatewayRoutes(app, prisma, queue, config);
-  registerAdminRoutes(app, prisma, requireAuth);
+  registerAdminRoutes(app, prisma, config, requireAuth);
 
   return app;
 }

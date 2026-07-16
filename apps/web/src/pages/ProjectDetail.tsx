@@ -100,7 +100,7 @@ export default function ProjectDetail() {
                   className="input-glow w-full cursor-pointer rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm outline-none"
                 >
                   <option value="heuristic">启发式(免费冒烟)</option>
-                  <option value="ai">AI 探索(需模型 Key)</option>
+                  <option value="ai">AI 探索(平台模型)</option>
                   <option value="cli">AI·本地 CLI(Claude Code)</option>
                 </select>
               </label>
@@ -128,7 +128,7 @@ export default function ProjectDetail() {
               {mode === 'heuristic' &&
                 '启发式:零成本爬行,会优先点击与目标相关的链接和按钮,但不会填写表单;要完整走注册/下单等流程请用 AI 模式。'}
               {mode === 'ai' &&
-                'AI 探索:多模态模型像真实用户一样操作,可填表单、走完整业务流程;用「设置」里配置的模型 Key,按步数计费。'}
+                'AI 探索:多模态模型像真实用户一样操作,可填表单、走完整业务流程;由平台内置模型供能,无需任何配置。'}
               {mode === 'cli' &&
                 'AI·本地 CLI:用执行机器的 Claude Code 订阅做决策,零 API 费用,可填表单走完整流程;每步约 5~15 秒,适合本机自用。'}
               {executor === 'runner' &&
