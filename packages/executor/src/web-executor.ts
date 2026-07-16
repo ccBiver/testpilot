@@ -1,5 +1,6 @@
 import { chromium, type Browser, type Page } from 'playwright';
 import type { Signal } from '@testpilot/shared';
+import type { ExplorerTarget } from './target.js';
 
 /** 页面上可交互的候选目标(供探索大脑决策) */
 export type Interactable =
@@ -25,7 +26,7 @@ export interface WebExecutorOptions {
  * Web 执行器:封装 Playwright,负责页面信号采集(console/network/crash)、
  * 观察(截图 + 可交互元素)与基础操作。AI 模式下 Midscene 直接复用 this.page。
  */
-export class WebExecutor {
+export class WebExecutor implements ExplorerTarget {
   private browser: Browser | null = null;
   private _page: Page | null = null;
   private signalBuffer: Signal[] = [];
@@ -206,6 +207,11 @@ export class WebExecutor {
       interactables.push({ kind: 'input', label: i.label, inputType: i.inputType, nth: i.nth });
     }
     return { pageUrl, pageTitle, interactables };
+  }
+
+  /** 当前位置(实现 ExplorerTarget) */
+  async location(): Promise<{ url: string; title: string }> {
+    return { url: this.page.url(), title: await this.page.title().catch(() => '') };
   }
 
   async screenshot(filePath: string): Promise<void> {

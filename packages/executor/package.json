@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@midscene/android": "^1.10.4",
     "@testpilot/shared": "workspace:*",
     "playwright": "^1.53.0"
   },

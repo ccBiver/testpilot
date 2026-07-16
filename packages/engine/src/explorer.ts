@@ -1,8 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { normalizeUrl, type Finding, type RunReport, type StepRecord } from '@testpilot/shared';
-import { defaultDetectors, type Detector } from '@testpilot/detectors';
-import type { WebExecutor } from '@testpilot/executor';
+import { webDetectors, type Detector } from '@testpilot/detectors';
+import type { ExplorerTarget } from '@testpilot/executor';
 import type { Brain } from './brains/types.js';
 
 export interface ExplorerOptions {
@@ -11,6 +11,8 @@ export interface ExplorerOptions {
   stepBudget: number;
   outDir: string;
   mode: 'heuristic' | 'ai' | 'cli';
+  /** 被测平台;android 影响不可达文案与默认检测器 */
+  platform?: 'web' | 'android';
   detectors?: readonly Detector[];
   onProgress?: (message: string) => void;
 }
@@ -28,11 +30,11 @@ export class Explorer {
   private lastScreenshotAbs?: string;
 
   constructor(
-    private readonly executor: WebExecutor,
+    private readonly executor: ExplorerTarget,
     private readonly brain: Brain,
     private readonly opts: ExplorerOptions,
   ) {
-    this.detectors = opts.detectors ?? defaultDetectors;
+    this.detectors = opts.detectors ?? webDetectors;
   }
 
   async run(): Promise<RunReport> {
@@ -40,8 +42,13 @@ export class Explorer {
     const shotsDir = path.join(this.opts.outDir, 'screenshots');
     await mkdir(shotsDir, { recursive: true });
 
+    const isAndroid = this.opts.platform === 'android';
     await this.executor.launch(this.opts.targetUrl);
-    await this.recordStep(1, `打开目标页面 ${this.opts.targetUrl}`, shotsDir);
+    await this.recordStep(
+      1,
+      isAndroid ? `启动应用 ${this.opts.targetUrl}` : `打开目标页面 ${this.opts.targetUrl}`,
+      shotsDir,
+    );
 
     let seq = 1;
     // 目标打不开(launch 内已重试一次)→ 记 Critical 缺陷并终止,不烧步数预算
@@ -50,15 +57,21 @@ export class Explorer {
         {
           detector: 'navigation',
           severity: 'critical',
-          title: `目标站点无法访问:${this.opts.targetUrl}`,
+          title: isAndroid
+            ? `应用无法启动:${this.opts.targetUrl}`
+            : `目标站点无法访问:${this.opts.targetUrl}`,
           fingerprint: `navigation:unreachable:${normalizeUrl(this.opts.targetUrl)}`,
           pageUrl: this.opts.targetUrl,
-          evidence: { hint: '连接被拒绝或超时,已重试 1 次。请确认地址可达,或站点是否有反爬风控。' },
+          evidence: {
+            hint: isAndroid
+              ? '应用启动失败:请确认包名正确、APK 已安装、设备已连接。'
+              : '连接被拒绝或超时,已重试 1 次。请确认地址可达,或站点是否有反爬风控。',
+          },
         },
         seq,
         path.join('screenshots', 'step-001.png'),
       );
-      this.opts.onProgress?.('目标站点无法访问,探索终止');
+      this.opts.onProgress?.(isAndroid ? '应用无法启动,探索终止' : '目标站点无法访问,探索终止');
       return this.finalize(startedAt, seq);
     }
 
@@ -132,8 +145,7 @@ export class Explorer {
     await this.executor.screenshot(screenshotAbs);
     this.lastScreenshotAbs = screenshotAbs;
 
-    const pageUrl = this.executor.page.url();
-    const pageTitle = await this.executor.page.title().catch(() => '');
+    const { url: pageUrl, title: pageTitle } = await this.executor.location();
     this.steps.push({ seq, description, pageUrl, pageTitle, screenshotFile, at: Date.now() });
     this.opts.onProgress?.(`步骤 ${seq}:${description}`);
 

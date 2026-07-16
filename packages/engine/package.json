@@ -17,6 +17,7 @@
     "@testpilot/shared": "workspace:*"
   },
   "devDependencies": {
+    "@midscene/android": "^1.10.4",
     "@types/node": "^26.1.1",
     "tsx": "^4.19.0",
     "typescript": "^5.8.0",

@@ -2,8 +2,17 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Command } from 'commander';
-import { WebExecutor } from '@testpilot/executor';
-import { AiBrain, CliBrain, Explorer, HeuristicBrain, renderHtmlReport, type Brain } from '@testpilot/engine';
+import { AndroidExecutor, WebExecutor } from '@testpilot/executor';
+import { androidDetectors } from '@testpilot/detectors';
+import {
+  AiBrain,
+  AndroidAiBrain,
+  CliBrain,
+  Explorer,
+  HeuristicBrain,
+  renderHtmlReport,
+  type Brain,
+} from '@testpilot/engine';
 
 const program = new Command();
 
@@ -50,6 +59,46 @@ program
       console.log(`\n✅ 完成:${report.stepsTaken} 步,覆盖 ${report.visitedUrls.length} 个页面,发现 ${report.findings.length} 个缺陷`);
       console.log(`📄 报告:${htmlPath}`);
       if (report.findings.length > 0) process.exitCode = 2; // 供 CI 判定
+    } finally {
+      await executor.dispose();
+    }
+  });
+
+program
+  .command('explore-app')
+  .description('探索 Android 应用(adb 驱动,需已连接模拟器/真机 + 多模态模型)')
+  .argument('<package>', '应用包名或 deeplink,如 com.android.settings')
+  .option('-s, --steps <n>', '探索步数预算', '20')
+  .option('-g, --goal <goal>', '探索目标描述')
+  .option('-d, --device <id>', 'adb 设备序列号,默认第一台')
+  .option('-o, --out <dir>', '输出目录,默认 runs/<时间戳>')
+  .action(async (pkg: string, opts) => {
+    const outDir = path.resolve(
+      opts.out ?? path.join('runs', new Date().toISOString().replace(/[:.]/g, '-')),
+    );
+    await mkdir(outDir, { recursive: true });
+
+    const executor = new AndroidExecutor({ deviceId: opts.device });
+    const brain = new AndroidAiBrain(executor);
+    const explorer = new Explorer(executor, brain, {
+      targetUrl: pkg,
+      goal: opts.goal,
+      stepBudget: Number(opts.steps),
+      outDir,
+      mode: 'ai',
+      platform: 'android',
+      detectors: androidDetectors,
+      onProgress: (m) => console.log(m),
+    });
+
+    console.log(`📱 TestPilot 开始探索 App ${pkg}(预算:${opts.steps} 步)\n`);
+    try {
+      const report = await explorer.run();
+      const htmlPath = path.join(outDir, 'report.html');
+      await writeFile(htmlPath, renderHtmlReport(report), 'utf8');
+      console.log(`\n✅ 完成:${report.stepsTaken} 步,发现 ${report.findings.length} 个缺陷`);
+      console.log(`📄 报告:${htmlPath}`);
+      if (report.findings.length > 0) process.exitCode = 2;
     } finally {
       await executor.dispose();
     }

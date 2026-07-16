@@ -41,6 +41,16 @@ export type Signal =
       kind: 'crash';
       pageUrl: string;
       at: number;
+    }
+  | {
+      // Android logcat 崩溃/ANR
+      kind: 'logcat';
+      level: 'fatal' | 'anr' | 'error';
+      tag: string;
+      message: string;
+      /** 当前所在应用包名 */
+      pkg: string;
+      at: number;
     };
 
 /** 一步操作的记录(轨迹即复现步骤) */
