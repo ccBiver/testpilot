@@ -8,6 +8,15 @@ import { BackLink, GradientButton, TextInput } from '../components/Ui';
 import { api, ApiError, type ApiProject, type ApiRun } from '../lib/api';
 import { RunStatusBadge } from '../components/RunStatus';
 
+/** 测试深度 → 探索步数预算的映射,用户不需要理解「步数」 */
+const DEPTH_STEPS = { quick: 15, standard: 30, deep: 60 } as const;
+
+const DEPTH_OPTIONS = [
+  { key: 'quick', label: '快速体检', desc: '约 3~5 分钟' },
+  { key: 'standard', label: '标准', desc: '约 5~10 分钟' },
+  { key: 'deep', label: '深度测试', desc: '约 10~20 分钟' },
+] as const;
+
 /** 项目详情:发起探索 + 运行历史 / Bug 看板 */
 export default function ProjectDetail() {
   const { id = '' } = useParams();
@@ -16,7 +25,7 @@ export default function ProjectDetail() {
   const [runs, setRuns] = useState<ApiRun[]>([]);
   const [tab, setTab] = useState<'runs' | 'issues'>('runs');
   const [goal, setGoal] = useState('');
-  const [steps, setSteps] = useState('30');
+  const [depth, setDepth] = useState<'quick' | 'standard' | 'deep'>('standard');
   const [useRunner, setUseRunner] = useState(false);
   const [error, setError] = useState('');
   const [launching, setLaunching] = useState(false);
@@ -44,7 +53,7 @@ export default function ProjectDetail() {
     try {
       const run = await api.createRun(id, {
         goal: goal.trim() || undefined,
-        stepBudget: Number(steps) || 30,
+        stepBudget: DEPTH_STEPS[depth],
         useRunner,
       });
       navigate(`/console/runs/${run.id}`);
@@ -81,30 +90,43 @@ export default function ProjectDetail() {
                 剩余额度 {me.quota} 次
               </span>
             </div>
-            <div className="mt-4 grid gap-4 sm:grid-cols-[3fr_1fr_auto]">
+            <div className="mt-4 grid gap-4 sm:grid-cols-[3fr_auto]">
               <TextInput
                 label="探索目标(可选)"
                 placeholder="比如:重点测试注册与下单流程"
                 value={goal}
                 onChange={(e) => setGoal(e.target.value)}
               />
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-slate-600">步数预算</span>
-                <input
-                  type="number"
-                  min={3}
-                  max={100}
-                  value={steps}
-                  onChange={(e) => setSteps(e.target.value)}
-                  className="input-glow w-full rounded-xl border-2 border-slate-200 bg-white px-4 py-3 text-sm outline-none"
-                />
-              </label>
               <div className="flex items-end">
                 <GradientButton type="submit" disabled={launching} className="inline-flex items-center gap-1.5 !py-3 text-sm">
                   {launching ? '排队中…' : <>开测 <IconArrowRight className="h-4 w-4" /></>}
                 </GradientButton>
               </div>
             </div>
+
+            <div className="mt-4">
+              <span className="mb-1.5 block text-sm font-medium text-slate-600">测试深度</span>
+              <div className="flex flex-wrap gap-2">
+                {DEPTH_OPTIONS.map((d) => (
+                  <button
+                    key={d.key}
+                    type="button"
+                    onClick={() => setDepth(d.key)}
+                    className={`cursor-pointer rounded-xl border-2 px-4 py-2 text-left transition-all ${
+                      depth === d.key
+                        ? 'border-indigo-400 bg-indigo-50/60 shadow-sm'
+                        : 'border-slate-200 bg-white hover:border-indigo-200'
+                    }`}
+                  >
+                    <span className={`block text-sm font-semibold ${depth === d.key ? 'text-indigo-600' : 'text-slate-700'}`}>
+                      {d.label}
+                    </span>
+                    <span className="block text-xs text-slate-400">{d.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {me.runnerEnabled && (
               <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-slate-600">
                 <input
@@ -113,7 +135,7 @@ export default function ProjectDetail() {
                   onChange={(e) => setUseRunner(e.target.checked)}
                   className="h-4 w-4 accent-indigo-500"
                 />
-                用本机 Runner 执行(Claude CLI 供能,不消耗额度,可测内网/localhost)
+                在我自己的电脑上执行(本机 Claude CLI 供能,不消耗额度;公网、内网、localhost 都能测)
               </label>
             )}
             {error && (
