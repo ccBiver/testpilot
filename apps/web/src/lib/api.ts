@@ -236,6 +236,15 @@ export const api = {
 
   getRun: (id: string) => request<{ run: ApiRun }>(`/api/runs/${id}`).then((d) => d.run),
 
+  getRunProgress: (id: string) =>
+    request<{ lines: string[]; status: string }>(`/api/runs/${id}/progress`),
+
+  changePassword: (oldPassword: string, newPassword: string) =>
+    request<{ changed: boolean }>('/api/auth/password', {
+      method: 'PUT',
+      body: { oldPassword, newPassword },
+    }),
+
   listIssues: (projectId: string, filters: { status?: string; severity?: string } = {}) => {
     const params = new URLSearchParams(
       Object.entries(filters).filter(([, v]) => Boolean(v)) as [string, string][],

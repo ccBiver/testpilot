@@ -320,4 +320,129 @@ describe('平台化模式:统一模型 / 注册开关 / Runner 权限', () => {
       expect(reopened.statusCode).toBe(201);
     });
   });
+
+  describe('密码体系', () => {
+    let pwHeaders: Record<string, string>;
+    let pwUserId: string;
+
+    it('自助修改密码:旧密码错误 400;成功后旧密码失效、新密码可登录', async () => {
+      const reg = await app.inject({
+        method: 'POST',
+        url: '/api/auth/register',
+        payload: { email: 'pw@testpilot.dev', password: 'password123' },
+      });
+      pwHeaders = { authorization: `Bearer ${reg.json().data.accessToken}` };
+      pwUserId = reg.json().data.user.id;
+
+      const wrongOld = await app.inject({
+        method: 'PUT',
+        url: '/api/auth/password',
+        headers: pwHeaders,
+        payload: { oldPassword: 'wrong-password', newPassword: 'newpassword456' },
+      });
+      expect(wrongOld.statusCode).toBe(400);
+
+      const ok = await app.inject({
+        method: 'PUT',
+        url: '/api/auth/password',
+        headers: pwHeaders,
+        payload: { oldPassword: 'password123', newPassword: 'newpassword456' },
+      });
+      expect(ok.statusCode).toBe(200);
+
+      const oldLogin = await app.inject({
+        method: 'POST',
+        url: '/api/auth/login',
+        payload: { email: 'pw@testpilot.dev', password: 'password123' },
+      });
+      expect(oldLogin.statusCode).toBe(401);
+      const newLogin = await app.inject({
+        method: 'POST',
+        url: '/api/auth/login',
+        payload: { email: 'pw@testpilot.dev', password: 'newpassword456' },
+      });
+      expect(newLogin.statusCode).toBe(200);
+    });
+
+    it('管理员重置密码:临时密码只回一次且可登录', async () => {
+      const reset = await app.inject({
+        method: 'POST',
+        url: `/api/admin/users/${pwUserId}/reset-password`,
+        headers: adminHeaders,
+      });
+      expect(reset.statusCode).toBe(200);
+      const temp = reset.json().data.tempPassword as string;
+      expect(temp).toHaveLength(12);
+
+      const login = await app.inject({
+        method: 'POST',
+        url: '/api/auth/login',
+        payload: { email: 'pw@testpilot.dev', password: temp },
+      });
+      expect(login.statusCode).toBe(200);
+
+      const memberReset = await app.inject({
+        method: 'POST',
+        url: `/api/admin/users/${pwUserId}/reset-password`,
+        headers: pwHeaders,
+      });
+      expect(memberReset.statusCode).toBe(403); // 普通用户无权
+    });
+  });
+
+  describe('运行实时进度', () => {
+    it('Runner 回传进度 → 所有者可轮询到;非所有者 404', async () => {
+      // 自建 runner 用户 + 任务
+      const reg = await app.inject({
+        method: 'POST',
+        url: '/api/auth/register',
+        payload: { email: 'progress@testpilot.dev', password: 'password123' },
+      });
+      const headers = { authorization: `Bearer ${reg.json().data.accessToken}` };
+      await prisma.user.update({
+        where: { id: reg.json().data.user.id },
+        data: { runnerEnabled: true },
+      });
+      const tok = await app.inject({
+        method: 'POST',
+        url: '/api/settings/runner-tokens',
+        headers,
+        payload: { name: '进度机' },
+      });
+      const runnerToken = tok.json().data.plaintext as string;
+      const proj = await app.inject({
+        method: 'POST',
+        url: '/api/projects',
+        headers,
+        payload: { name: '进度项目', targetUrl: 'https://example.com/' },
+      });
+      const runRes = await app.inject({
+        method: 'POST',
+        url: `/api/projects/${proj.json().data.project.id}/runs`,
+        headers,
+        payload: { useRunner: true, stepBudget: 3 },
+      });
+      const runId = runRes.json().data.run.id as string;
+
+      // 领取后回传两批进度
+      await app.inject({ method: 'POST', url: '/api/runner/claim', headers: { 'x-runner-token': runnerToken } });
+      for (const lines of [['步骤 1:打开目标页面'], ['步骤 2:点击按钮「注册」', '  ⚠ 发现缺陷 [high] x']]) {
+        const post = await app.inject({
+          method: 'POST',
+          url: `/api/runner/runs/${runId}/progress`,
+          headers: { 'x-runner-token': runnerToken },
+          payload: { lines },
+        });
+        expect(post.statusCode).toBe(200);
+      }
+
+      const progress = await app.inject({ method: 'GET', url: `/api/runs/${runId}/progress`, headers });
+      expect(progress.statusCode).toBe(200);
+      expect(progress.json().data.lines).toHaveLength(3);
+      expect(progress.json().data.status).toBe('running');
+
+      const other = await app.inject({ method: 'GET', url: `/api/runs/${runId}/progress`, headers: adminHeaders });
+      expect(other.statusCode).toBe(404); // 数据隔离:非所有者不可见
+    });
+  });
 });

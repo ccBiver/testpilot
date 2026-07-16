@@ -102,6 +102,19 @@ export class AuthService {
     return toPublicUser(user);
   }
 
+  /** 自助修改密码:校验旧密码后更新 */
+  async changePassword(userId: string, oldPassword: string, newPassword: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new AuthError(401, '用户不存在');
+    if (!(await bcrypt.compare(oldPassword, user.passwordHash))) {
+      throw new AuthError(400, '当前密码不正确');
+    }
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: await bcrypt.hash(newPassword, 10) },
+    });
+  }
+
   /** 校验 Bearer access token,守卫用 */
   verifyAccess(token: string): AccessPayload {
     const payload = this.verifyToken(token);

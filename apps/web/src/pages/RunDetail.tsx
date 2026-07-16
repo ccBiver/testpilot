@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import ConsoleShell from '../components/ConsoleShell';
 import { IconBug, IconChevronRight } from '../components/Icons';
@@ -70,21 +70,69 @@ function FindingCard({ finding, run, index }: { finding: ApiFinding; run: ApiRun
   );
 }
 
-/** 运行详情:进行中轮询,完成后展示缺陷与轨迹 */
+/** 实时进度终端:执行中滚动展示 AI 每一步(自动吸底) */
+function LiveProgress({ lines }: { lines: string[] }) {
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    boxRef.current?.scrollTo({ top: boxRef.current.scrollHeight, behavior: 'smooth' });
+  }, [lines.length]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mx-auto mt-6 w-full max-w-2xl overflow-hidden rounded-2xl bg-slate-900 text-left shadow-xl shadow-slate-300/60"
+    >
+      <div className="flex items-center gap-2 border-b border-slate-800 px-4 py-2.5">
+        <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
+        <span className="h-2.5 w-2.5 rounded-full bg-yellow-400" />
+        <span className="h-2.5 w-2.5 rounded-full bg-green-400" />
+        <span className="ml-2 inline-flex items-center gap-2 text-xs text-slate-400">
+          <motion.span
+            className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400"
+            animate={{ opacity: [1, 0.2, 1] }}
+            transition={{ duration: 1.2, repeat: Infinity }}
+          />
+          实时进度
+        </span>
+      </div>
+      <div ref={boxRef} className="max-h-64 overflow-y-auto p-4 font-mono text-xs leading-relaxed">
+        {lines.length === 0 && <p className="text-slate-500">等待执行器输出…</p>}
+        {lines.map((line, i) => (
+          <motion.p
+            key={`${i}-${line.slice(0, 20)}`}
+            initial={{ opacity: 0, x: -6 }}
+            animate={{ opacity: 1, x: 0 }}
+            className={line.includes('发现缺陷') ? 'text-rose-400' : 'text-slate-300'}
+          >
+            {line}
+          </motion.p>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+/** 运行详情:进行中轮询(状态 + 实时进度),完成后展示缺陷与轨迹 */
 export default function RunDetail() {
   const { id = '' } = useParams();
   const [run, setRun] = useState<ApiRun | null>(null);
+  const [progressLines, setProgressLines] = useState<string[]>([]);
 
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
     const load = () =>
-      api.getRun(id).then((r) => {
-        setRun(r);
-        if ((r.status === 'done' || r.status === 'failed') && timer) {
-          clearInterval(timer);
-          timer = null;
-        }
-      }).catch(() => {});
+      Promise.all([api.getRun(id), api.getRunProgress(id).catch(() => null)])
+        .then(([r, p]) => {
+          setRun(r);
+          if (p) setProgressLines(p.lines);
+          if ((r.status === 'done' || r.status === 'failed') && timer) {
+            clearInterval(timer);
+            timer = null;
+          }
+        })
+        .catch(() => {});
     load();
     timer = setInterval(load, 1500);
     return () => {
@@ -124,9 +172,14 @@ export default function RunDetail() {
                 <IconBug className="h-8 w-8" />
               </motion.span>
               <p className="text-slate-500">
-                {run.status === 'queued' ? '排队中,马上开始…' : 'AI 正在像真实用户一样探索目标站点…'}
+                {run.status === 'queued'
+                  ? run.executor === 'runner'
+                    ? '排队中,等待你的本机 Runner 领取…'
+                    : '排队中,马上开始…'
+                  : 'AI 正在像真实用户一样探索目标站点…'}
               </p>
               <p className="text-xs text-slate-400">页面会自动刷新,无需手动操作</p>
+              <LiveProgress lines={progressLines} />
             </motion.div>
           )}
 

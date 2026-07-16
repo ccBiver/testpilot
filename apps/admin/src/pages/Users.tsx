@@ -6,6 +6,7 @@ export default function Users() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState('');
+  const [resetInfo, setResetInfo] = useState<{ email: string; tempPassword: string } | null>(null);
 
   const load = useCallback(() => {
     api.users().then(setUsers).catch((err) => setError(err instanceof ApiError ? err.message : '加载失败'));
@@ -33,6 +34,20 @@ export default function Users() {
     }
   };
 
+  const resetPassword = async (u: AdminUser) => {
+    if (!window.confirm(`确定重置 ${u.email} 的密码?其当前密码将立即失效。`)) return;
+    setBusyId(u.id);
+    setError('');
+    try {
+      const tempPassword = await api.resetPassword(u.id);
+      setResetInfo({ email: u.email, tempPassword });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '重置失败');
+    } finally {
+      setBusyId('');
+    }
+  };
+
   const editQuota = (u: AdminUser) => {
     const input = window.prompt(`设置 ${u.email} 的剩余额度(当前 ${u.quota} 次):`, String(u.quota));
     if (input === null) return;
@@ -51,6 +66,30 @@ export default function Users() {
           <h1 className="text-2xl font-black">用户管理</h1>
           <p className="mt-1 text-sm text-slate-400">共 {users.length} 位用户</p>
           {error && <p className="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-sm font-medium text-rose-600">{error}</p>}
+          {resetInfo && (
+            <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+              <span className="font-medium text-amber-800">
+                已重置 {resetInfo.email} 的密码,临时密码(仅显示这一次):
+              </span>
+              <code className="rounded-lg bg-white px-3 py-1 font-mono text-sm font-bold text-slate-800">
+                {resetInfo.tempPassword}
+              </code>
+              <button
+                onClick={() => {
+                  void navigator.clipboard.writeText(resetInfo.tempPassword).catch(() => {});
+                }}
+                className="cursor-pointer rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-200"
+              >
+                复制
+              </button>
+              <button
+                onClick={() => setResetInfo(null)}
+                className="cursor-pointer text-xs text-amber-500 hover:underline"
+              >
+                关闭
+              </button>
+            </div>
+          )}
 
           <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-sm">
             <table className="w-full min-w-[760px] text-sm">
@@ -120,25 +159,34 @@ export default function Users() {
                     <td className="px-4 py-3 text-slate-500">{u.runCount}</td>
                     <td className="px-4 py-3 text-xs text-slate-400">{new Date(u.createdAt).toLocaleDateString('zh-CN')}</td>
                     <td className="px-4 py-3">
-                      {u.id !== me.id && (
+                      <div className="flex gap-2">
+                        {u.id !== me.id && (
+                          <button
+                            onClick={() =>
+                              patch(
+                                u,
+                                { status: u.status === 'active' ? 'disabled' : 'active' },
+                                u.status === 'active' ? `确定禁用 ${u.email}?其登录与任务将立即失效。` : undefined,
+                              )
+                            }
+                            disabled={busyId === u.id}
+                            className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-50 ${
+                              u.status === 'active'
+                                ? 'border-rose-200 text-rose-500 hover:bg-rose-50'
+                                : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
+                            }`}
+                          >
+                            {u.status === 'active' ? '禁用' : '启用'}
+                          </button>
+                        )}
                         <button
-                          onClick={() =>
-                            patch(
-                              u,
-                              { status: u.status === 'active' ? 'disabled' : 'active' },
-                              u.status === 'active' ? `确定禁用 ${u.email}?其登录与任务将立即失效。` : undefined,
-                            )
-                          }
+                          onClick={() => resetPassword(u)}
                           disabled={busyId === u.id}
-                          className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-50 ${
-                            u.status === 'active'
-                              ? 'border-rose-200 text-rose-500 hover:bg-rose-50'
-                              : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
-                          }`}
+                          className="cursor-pointer rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-500 transition-colors hover:border-amber-200 hover:bg-amber-50 hover:text-amber-600 disabled:opacity-50"
                         >
-                          {u.status === 'active' ? '禁用' : '启用'}
+                          重置密码
                         </button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}

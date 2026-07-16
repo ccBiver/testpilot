@@ -36,6 +36,10 @@ const completeSchema = z.object({
 
 const failSchema = z.object({ error: z.string().min(1).max(500) });
 
+const progressSchema = z.object({
+  lines: z.array(z.string().max(500)).min(1).max(50),
+});
+
 /** Runner 协议:x-runner-token 头鉴权,领取本用户的 runner 任务并回传结果 */
 export function registerRunnerGatewayRoutes(
   app: FastifyInstance,
@@ -117,6 +121,18 @@ export function registerRunnerGatewayRoutes(
       where: { id, userId: token.userId, executor: 'runner', status: 'running' },
     });
   }
+
+  // 回传实时进度(执行中随时可发,平台页面轮询展示)
+  app.post('/api/runner/runs/:id/progress', async (req, reply) => {
+    const token = await authToken(req, reply);
+    if (!token) return;
+    const run = await findRunningRun(token, req.params);
+    if (!run) return reply.code(404).send({ ok: false, error: '任务不存在或状态不允许回传' });
+
+    const { lines } = progressSchema.parse(req.body);
+    for (const line of lines) queue.appendProgress(run.id, line);
+    return reply.send({ ok: true, data: { saved: true } });
+  });
 
   // 回传成功结果
   app.post('/api/runner/runs/:id/complete', async (req, reply) => {

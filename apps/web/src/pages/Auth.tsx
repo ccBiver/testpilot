@@ -15,6 +15,7 @@ export default function Auth({ mode }: AuthProps) {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showForgot, setShowForgot] = useState(false);
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -112,6 +113,22 @@ export default function Auth({ mode }: AuthProps) {
             <>已有账号?<Link to="/login" className="font-semibold text-indigo-600 hover:underline">直接登录</Link></>
           )}
         </p>
+        {isLogin && (
+          <p className="mt-2 text-center text-xs text-slate-400">
+            <button
+              type="button"
+              onClick={() => setShowForgot((v) => !v)}
+              className="cursor-pointer hover:text-indigo-500 hover:underline"
+            >
+              忘记密码?
+            </button>
+            {showForgot && (
+              <span className="mt-1 block text-slate-400">
+                请联系管理员重置密码,重置后可在「设置」里改成自己的新密码。
+              </span>
+            )}
+          </p>
+        )}
       </motion.div>
     </div>
   );

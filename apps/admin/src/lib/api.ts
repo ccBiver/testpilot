@@ -165,6 +165,11 @@ export const api = {
 
   runs: () => request<{ runs: AdminRun[] }>('/api/admin/runs').then((d) => d.runs),
 
+  resetPassword: (id: string) =>
+    request<{ tempPassword: string }>(`/api/admin/users/${id}/reset-password`, { method: 'POST' }).then(
+      (d) => d.tempPassword,
+    ),
+
   getModelConfig: () =>
     request<{ model: PlatformModel | null }>('/api/admin/model-config').then((d) => d.model),
 

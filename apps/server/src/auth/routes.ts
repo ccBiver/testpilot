@@ -11,6 +11,11 @@ const refreshSchema = z.object({
   refreshToken: z.string().min(1, '缺少刷新令牌'),
 });
 
+const changePasswordSchema = z.object({
+  oldPassword: z.string().min(1, '请输入当前密码'),
+  newPassword: z.string().min(8, '新密码至少需要 8 位').max(72, '密码过长'),
+});
+
 declare module 'fastify' {
   interface FastifyRequest {
     authUser?: AccessPayload;
@@ -58,5 +63,11 @@ export function registerAuthRoutes(app: FastifyInstance, auth: AuthService): voi
   app.get('/api/auth/me', { preHandler: requireAuth }, async (req, reply) => {
     const user = await auth.me(req.authUser!.sub);
     return reply.send({ ok: true, data: { user } });
+  });
+
+  app.put('/api/auth/password', { preHandler: requireAuth }, async (req, reply) => {
+    const body = changePasswordSchema.parse(req.body);
+    await auth.changePassword(req.authUser!.sub, body.oldPassword, body.newPassword);
+    return reply.send({ ok: true, data: { changed: true } });
   });
 }

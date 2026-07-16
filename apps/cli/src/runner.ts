@@ -84,6 +84,20 @@ export class Runner {
     this.log(`▶ 领取任务 ${run.id}:${run.targetUrl}(模式 ${run.mode},${run.stepBudget} 步)`);
     const outDir = await mkdtemp(path.join(os.tmpdir(), `testpilot-runner-${run.id}-`));
     const executor = new WebExecutor({ headless: !this.opts.headed });
+
+    // 进度批量回传:攒 1.5s 一发,失败静默(不影响执行),平台运行页实时展示
+    let pendingProgress: string[] = [];
+    const flushProgress = async () => {
+      if (pendingProgress.length === 0) return;
+      const lines = pendingProgress.slice(0, 50);
+      pendingProgress = pendingProgress.slice(50);
+      await this.request(`/api/runner/runs/${run.id}/progress`, {
+        method: 'POST',
+        body: JSON.stringify({ lines }),
+      }).catch(() => {});
+    };
+    const progressTimer = setInterval(() => void flushProgress(), 1500);
+
     try {
       const explorer = new Explorer(executor, this.brainFor(run, executor), {
         targetUrl: run.targetUrl,
@@ -91,9 +105,13 @@ export class Runner {
         stepBudget: run.stepBudget,
         outDir,
         mode: run.mode === 'ai' ? 'ai' : run.mode === 'cli' ? 'cli' : 'heuristic',
-        onProgress: (m) => this.log(`  ${m}`),
+        onProgress: (m) => {
+          this.log(`  ${m}`);
+          pendingProgress.push(m);
+        },
       });
       const report = await explorer.run();
+      await flushProgress();
       await this.uploadArtifacts(run.id, path.join(outDir, 'screenshots'));
       await this.request(`/api/runner/runs/${run.id}/complete`, {
         method: 'POST',
@@ -108,6 +126,7 @@ export class Runner {
         body: JSON.stringify({ error: message.slice(0, 500) }),
       }).catch(() => {});
     } finally {
+      clearInterval(progressTimer);
       await executor.dispose();
     }
   }

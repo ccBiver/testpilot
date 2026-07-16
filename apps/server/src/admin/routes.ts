@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+import bcrypt from 'bcryptjs';
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandler } from 'fastify';
 import { z } from 'zod';
 import type { PrismaClient } from '@prisma/client';
@@ -127,6 +129,22 @@ export function registerAdminRoutes(
         },
       },
     });
+  });
+
+  // 重置用户密码(SMTP 邮件找回上线前的兜底):临时密码只在响应里出现一次
+  app.post('/api/admin/users/:id/reset-password', pre, async (req, reply) => {
+    const { id } = idParamSchema.parse(req.params);
+    const target = await prisma.user.findUnique({ where: { id } });
+    if (!target) return reply.code(404).send({ ok: false, error: '用户不存在' });
+
+    // 12 位可读临时密码(去掉易混字符)
+    const alphabet = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    const tempPassword = Array.from(randomBytes(12), (b) => alphabet[b % alphabet.length]).join('');
+    await prisma.user.update({
+      where: { id },
+      data: { passwordHash: await bcrypt.hash(tempPassword, 10) },
+    });
+    return reply.send({ ok: true, data: { tempPassword } });
   });
 
   // 新用户默认免费额度
