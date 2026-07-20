@@ -100,9 +100,9 @@ export interface TestCase {
 
 /** 用例文件:一批用例 + 被测目标 */
 export interface TestCaseSuite {
-  /** web=URL,android=包名 */
-  target: string;
-  platform: 'web' | 'android';
+  /** web=URL,android=包名;生成时可留空,执行时提供 */
+  target?: string;
+  platform?: 'web' | 'android';
   cases: TestCase[];
 }
 

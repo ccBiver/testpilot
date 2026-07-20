@@ -39,10 +39,11 @@ describe('generateCasesFromDoc', () => {
       ]),
     );
     const suite = await generateCasesFromDoc(
-      { doc: '需求...', target: 'https://x.com/', platform: 'web', maxCases: 2 },
+      { doc: '需求...', maxCases: 2 },
       invoke,
     );
-    expect(suite.target).toBe('https://x.com/');
+    // 生成阶段不绑定目标/平台(执行时再定)
+    expect(suite.target).toBeUndefined();
     expect(suite.cases).toHaveLength(2);
     expect(suite.cases[0]!.id).toBe('case-1');
     expect(suite.cases[0]!.source).toBe('doc');
@@ -50,19 +51,13 @@ describe('generateCasesFromDoc', () => {
 
   it('模型输出不可解析 → 抛错', async () => {
     const invoke = vi.fn(async () => '我无法生成');
-    await expect(
-      generateCasesFromDoc({ doc: 'x', target: 'x', platform: 'web' }, invoke),
-    ).rejects.toThrow(/无法解析/);
+    await expect(generateCasesFromDoc({ doc: 'x' }, invoke)).rejects.toThrow(/无法解析/);
   });
 
-  it('prompt 含平台提示与侧重', async () => {
+  it('prompt 含来源侧重与正文', async () => {
     const invoke = vi.fn(async (_prompt: string) => '[{"name":"x","steps":[{"action":"y"}]}]');
-    await generateCasesFromDoc(
-      { doc: 'DOC', target: 'com.app', platform: 'android', focus: '重点测支付' },
-      invoke,
-    );
+    await generateCasesFromDoc({ doc: 'DOC', focus: '重点测支付' }, invoke);
     const prompt = invoke.mock.calls[0]?.[0] ?? '';
-    expect(prompt).toContain('Android');
     expect(prompt).toContain('重点测支付');
     expect(prompt).toContain('DOC');
   });

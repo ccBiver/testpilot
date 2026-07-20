@@ -160,8 +160,6 @@ export interface GenCasesOptions {
   /** Figma 链接/fileKey(UI 规格),可与 docPath 同时提供 */
   figma?: string;
   figmaSource?: 'desktop' | 'token';
-  target: string;
-  platform: 'web' | 'android';
   out: string;
   max?: number;
   focus?: string;
@@ -188,12 +186,10 @@ export async function runGenCases(opts: GenCasesOptions): Promise<string> {
 
   const kind: 'doc' | 'figma' | 'both' =
     opts.docPath && opts.figma ? 'both' : opts.docPath ? 'doc' : 'figma';
-  console.log(`📝 生成用例(${opts.platform},来源 ${kind},本机 Claude CLI)…`);
+  console.log(`📝 生成用例(来源 ${kind},本机 Claude CLI)…`);
   const suite = await generateCasesFromDoc({
     doc: parts.join('\n\n'),
     kind,
-    target: opts.target,
-    platform: opts.platform,
     maxCases: opts.max ?? 8,
     focus: opts.focus,
   });
@@ -207,18 +203,23 @@ export async function runGenCases(opts: GenCasesOptions): Promise<string> {
 export interface RunCasesOptions {
   file: string;
   engine: 'cli' | 'midscene';
+  /** 执行目标:web=URL,android=包名;覆盖用例文件里的值 */
+  target: string;
+  /** 平台;覆盖用例文件里的值 */
+  platform: 'web' | 'android';
   headed?: boolean;
   out?: string;
 }
 
-/** 执行用例文件 */
+/** 执行用例文件(目标与平台在此提供,不依赖用例文件里是否绑定) */
 export async function runCases(opts: RunCasesOptions): Promise<void> {
-  const suite = await loadSuite(path.resolve(opts.file));
+  const loaded = await loadSuite(path.resolve(opts.file));
+  const suite = { ...loaded, target: opts.target, platform: opts.platform };
   const outDir = newOutDir(opts.out);
   await mkdir(outDir, { recursive: true });
 
   let target: ExplorerTarget;
-  if (suite.platform === 'android') {
+  if (opts.platform === 'android') {
     target = new AndroidExecutor();
   } else {
     const { ensureChromium } = await import('./ensure-browser.js');
@@ -230,13 +231,13 @@ export async function runCases(opts: RunCasesOptions): Promise<void> {
   const useCli = opts.engine === 'cli';
   const agentFactory = useCli
     ? async (t: ExplorerTarget) =>
-        suite.platform === 'android'
+        opts.platform === 'android'
           ? new AndroidCliAgent(t as AndroidExecutor)
           : new CliWebAgent(t as WebExecutor)
     : undefined;
   const runner = new CaseRunner(target, suite, { outDir, agentFactory, onProgress: log });
   console.log(`引擎:${useCli ? '本机 Claude CLI' : '多模态模型(midscene)'}`);
-  console.log(`🧪 执行 ${suite.cases.length} 条用例 → ${suite.target}(${suite.platform})\n`);
+  console.log(`🧪 执行 ${suite.cases.length} 条用例 → ${opts.target}(${opts.platform})\n`);
   try {
     const report = await runner.run();
     const htmlPath = path.join(outDir, 'cases.html');

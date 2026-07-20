@@ -11,13 +11,14 @@ const stepSchema = z.object({
 const caseSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1),
-  source: z.enum(['manual', 'doc', 'figma']).optional(),
+  source: z.enum(['manual', 'doc', 'figma', 'both']).optional(),
   steps: z.array(stepSchema).min(1),
 });
 
+// 生成阶段不绑定目标/平台,故二者可选;执行时由 --target/--platform 提供
 const suiteSchema = z.object({
-  target: z.string().min(1),
-  platform: z.enum(['web', 'android']).default('web'),
+  target: z.string().optional(),
+  platform: z.enum(['web', 'android']).optional(),
   cases: z.array(caseSchema).min(1),
 });
 

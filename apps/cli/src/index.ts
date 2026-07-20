@@ -62,12 +62,10 @@ program
 
 program
   .command('gen-cases')
-  .description('从需求文档和/或 Figma 设计稿生成测试用例(.yaml);两者可同时,功能+UI 都覆盖')
+  .description('从需求文档和/或 Figma 设计稿生成测试用例(.yaml);只管「测什么」,目标在执行时提供')
   .argument('[doc]', '需求文档路径(.md/.txt/.pdf/.docx);可与 --figma 同时提供')
   .option('--figma <url>', 'Figma 链接或 fileKey(默认桌面 App 授权,无需 token)')
   .option('--figma-token', '改用个人令牌方式(需 FIGMA_API_KEY)', false)
-  .requiredOption('-t, --target <target>', '被测目标:web 填 URL,android 填包名')
-  .option('-p, --platform <platform>', '平台:web | android', 'web')
   .option('-o, --out <file>', '输出用例文件路径', 'cases.yaml')
   .option('-n, --max <n>', '最多生成用例数', '8')
   .option('-f, --focus <focus>', '侧重描述')
@@ -76,25 +74,38 @@ program
       docPath,
       figma: opts.figma,
       figmaSource: opts.figmaToken ? 'token' : 'desktop',
-      target: opts.target,
-      platform: opts.platform === 'android' ? 'android' : 'web',
       out: opts.out,
       max: Number(opts.max) || 8,
       focus: opts.focus,
     });
-    console.log(`   下一步:testpilot run-cases ${opts.out}`);
+    console.log(`   下一步:testpilot run-cases ${opts.out} -t <URL/包名>`);
   });
 
 program
   .command('run-cases')
   .description('执行测试用例文件(.yaml/.json)')
   .argument('<file>', '用例文件路径')
+  .requiredOption('-t, --target <target>', '被测目标:web 填 URL,android 填包名')
+  .option('-p, --platform <platform>', '平台:web | android(默认按 target 猜:http→web,否则 android)')
   .option('-o, --out <dir>', '输出目录')
   .option('-e, --engine <engine>', '引擎:cli(本机 Claude)| midscene(模型 key)', 'cli')
   .option('--headed', '显示浏览器窗口(仅 Web)', false)
-  .action((file: string, opts) =>
-    runCases({ file, engine: opts.engine === 'midscene' ? 'midscene' : 'cli', headed: opts.headed, out: opts.out }),
-  );
+  .action((file: string, opts) => {
+    const platform: 'web' | 'android' =
+      opts.platform === 'android' || opts.platform === 'web'
+        ? opts.platform
+        : /^https?:\/\//.test(opts.target)
+          ? 'web'
+          : 'android';
+    return runCases({
+      file,
+      target: opts.target,
+      platform,
+      engine: opts.engine === 'midscene' ? 'midscene' : 'cli',
+      headed: opts.headed,
+      out: opts.out,
+    });
+  });
 
 program.parseAsync().catch((err) => {
   console.error('❌ 运行失败:', err instanceof Error ? err.message : err);

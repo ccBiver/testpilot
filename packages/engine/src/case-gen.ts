@@ -6,9 +6,6 @@ export interface CaseGenInput {
   doc: string;
   /** 输入类型:doc 功能文档 / figma 设计稿 / both 文档+设计稿(影响提示词与用例 source) */
   kind?: 'doc' | 'figma' | 'both';
-  /** 被测目标:web=URL,android=包名 */
-  target: string;
-  platform: 'web' | 'android';
   /** 期望用例数量上限,默认 8 */
   maxCases?: number;
   /** 补充侧重,如「重点覆盖注册与支付流程」 */
@@ -30,9 +27,8 @@ export async function generateCasesFromDoc(
   if (cases.length === 0) {
     throw new Error('未能生成用例:模型输出无法解析,请检查输入内容或重试');
   }
+  // 生成阶段只产出「测什么」;目标(URL/包名)与平台在执行时提供
   return {
-    target: input.target,
-    platform: input.platform,
     cases: cases.slice(0, maxCases).map((c, i) => ({ ...c, id: `case-${i + 1}`, source: kind })),
   };
 }
@@ -40,9 +36,7 @@ export async function generateCasesFromDoc(
 function buildPrompt(input: CaseGenInput, maxCases: number): string {
   const focusPart = input.focus ? `\n特别侧重:${input.focus}` : '';
   const platformHint =
-    input.platform === 'android'
-      ? '被测对象是 Android 应用,操作用「点击/输入/滑动/返回」等移动端动作。'
-      : '被测对象是网页,操作用「点击/输入/打开链接」等 Web 动作。';
+    '操作用自然语言描述用户动作(点击、输入、滑动、返回等),尽量与具体平台无关,同一批用例既能跑网页也能跑 App。';
   const kind = input.kind ?? 'doc';
   const sourceLabel =
     kind === 'both'

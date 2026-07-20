@@ -32,10 +32,13 @@ export class CaseRunner {
 
   async run(): Promise<CaseRunReport> {
     const startedAt = Date.now();
+    const targetUri = this.suite.target;
+    if (!targetUri) throw new Error('用例缺少执行目标(target),请在执行时用 -t 指定');
+    const platform = this.suite.platform ?? 'web';
     const shotsDir = path.join(this.opts.outDir, 'screenshots');
     await mkdir(shotsDir, { recursive: true });
 
-    await this.target.launch(this.suite.target);
+    await this.target.launch(targetUri);
     const agent = this.opts.agentFactory
       ? await this.opts.agentFactory(this.target)
       : await this.target.createAgent(this.opts.modelConfig);
@@ -46,7 +49,7 @@ export class CaseRunner {
     for (const testCase of this.suite.cases) {
       this.opts.onProgress?.(`▶ 用例「${testCase.name}」`);
       // 每条用例回到起点,避免相互污染
-      await this.target.launch(this.suite.target).catch(() => {});
+      await this.target.launch(targetUri).catch(() => {});
       const result = await this.runCase(testCase, agent, shotsDir, () => ++shotSeq);
       results.push(result);
       this.opts.onProgress?.(
@@ -56,8 +59,8 @@ export class CaseRunner {
 
     const report: CaseRunReport = {
       runId: path.basename(this.opts.outDir),
-      target: this.suite.target,
-      platform: this.suite.platform,
+      target: targetUri,
+      platform,
       startedAt,
       finishedAt: Date.now(),
       total: results.length,

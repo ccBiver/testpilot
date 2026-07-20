@@ -139,47 +139,52 @@ async function wizardGen(): Promise<void> {
     gen.figmaSource = auth as 'desktop' | 'token';
   }
 
-  const platform = await p.select({
-    message: '被测平台?',
-    options: [
-      { value: 'web', label: 'Web 网站' },
-      { value: 'android', label: 'Android 应用' },
-    ],
-  });
-  if (cancelled(platform)) return;
-  const target = await p.text({
-    message: platform === 'android' ? '应用包名' : '网站地址',
-    placeholder: platform === 'android' ? 'com.example.app' : 'https://example.com',
-  });
-  if (cancelled(target)) return;
   const out = await p.text({ message: '用例文件保存到', placeholder: 'cases.yaml', defaultValue: 'cases.yaml' });
   if (cancelled(out)) return;
 
-  const outPath = await runGenCases({
-    ...gen,
-    target: String(target),
-    platform: platform as 'web' | 'android',
-    out: String(out) || 'cases.yaml',
-  });
+  // 生成只管「测什么」:不问平台/目标,产出的用例不绑定任何 URL/包名
+  const outPath = await runGenCases({ ...gen, out: String(out) || 'cases.yaml' });
 
-  // 生成后直接问要不要立即执行,省掉一条命令
-  const runNow = await p.confirm({ message: '马上执行这批用例?' });
+  // 生成后可直接执行(此时才问在哪跑),省掉一条命令
+  const runNow = await p.confirm({ message: '马上执行这批用例?(现在选在哪跑)' });
   if (cancelled(runNow) || !runNow) {
-    p.outro(`稍后可执行:testpilot run-cases ${String(out) || 'cases.yaml'}`);
+    p.outro(`稍后执行:testpilot run-cases ${String(out) || 'cases.yaml'} -t <URL/包名>`);
     return;
   }
+  const where = await pickTargetAndPlatform();
+  if (where === null) return;
   const engine = await pickEngine();
   if (engine === null) return;
-  await runCases({ file: outPath, engine });
+  await runCases({ file: outPath, ...where, engine });
 }
 
 async function wizardRun(): Promise<void> {
   const file = await p.text({ message: '用例文件路径', placeholder: 'cases.yaml', defaultValue: 'cases.yaml' });
   if (cancelled(file)) return;
+  const where = await pickTargetAndPlatform();
+  if (where === null) return;
   const engine = await pickEngine();
   if (engine === null) return;
-  if (!(await confirmRun(`执行用例 ${String(file) || 'cases.yaml'}`))) return;
-  await runCases({ file: String(file) || 'cases.yaml', engine });
+  await runCases({ file: String(file) || 'cases.yaml', ...where, engine });
+}
+
+/** 执行时选「在哪跑」:平台 + 目标 */
+async function pickTargetAndPlatform(): Promise<{ target: string; platform: 'web' | 'android' } | null> {
+  const platform = await p.select({
+    message: '在哪跑这些用例?',
+    options: [
+      { value: 'web', label: 'Web 网站' },
+      { value: 'android', label: 'Android 应用', hint: '需已连接模拟器/真机' },
+    ],
+  });
+  if (cancelled(platform)) return null;
+  const target = await p.text({
+    message: platform === 'android' ? '应用包名' : '网站地址',
+    placeholder: platform === 'android' ? 'com.example.app' : 'https://example.com',
+    validate: (v) => (!v ? '不能为空' : undefined),
+  });
+  if (cancelled(target)) return null;
+  return { target: String(target), platform: platform as 'web' | 'android' };
 }
 
 async function pickDepth(): Promise<number | null> {
