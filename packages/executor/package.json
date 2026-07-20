@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@midscene/android": "^1.10.4",
+    "@midscene/ios": "^1.10.5",
     "@midscene/web": "^0.30.10",
     "@playwright/test": "^1.61.1",
     "@testpilot/shared": "workspace:*",

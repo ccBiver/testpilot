@@ -1,6 +1,6 @@
 // CLI 入口:直接 `testpilot` 进交互向导;子命令供脚本化/老手用(shebang 由 tsup banner 注入)
 import { Command } from 'commander';
-import { runCases, runExplore, runExploreApp, runGenCases } from './actions.js';
+import { runCases, runExplore, runExploreApp, runExploreIos, runGenCases } from './actions.js';
 
 const program = new Command();
 
@@ -46,6 +46,18 @@ program
   .option('-o, --out <dir>', '输出目录')
   .action((pkg: string, opts) =>
     runExploreApp({ pkg, goal: opts.goal, steps: Number(opts.steps) || 20, device: opts.device, out: opts.out }),
+  );
+
+program
+  .command('explore-ios')
+  .description('AI 自主探索 iOS 应用(仅 macOS,需 Xcode + 模拟器 + 多模态模型)')
+  .argument('<bundleId>', 'App bundle id,如 com.apple.Preferences')
+  .option('-s, --steps <n>', '探索步数预算', '20')
+  .option('-g, --goal <goal>', '探索目标描述')
+  .option('-d, --device <id>', '模拟器 udid,默认已启动的')
+  .option('-o, --out <dir>', '输出目录')
+  .action((bundleId: string, opts) =>
+    runExploreIos({ bundleId, goal: opts.goal, steps: Number(opts.steps) || 20, device: opts.device, out: opts.out }),
   );
 
 program

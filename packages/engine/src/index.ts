@@ -1,7 +1,7 @@
 export { Explorer, type ExplorerOptions } from './explorer.js';
 export { HeuristicBrain } from './brains/heuristic.js';
 export { AiBrain } from './brains/ai.js';
-export { AndroidAiBrain } from './brains/android-ai.js';
+export { AndroidAiBrain, AndroidAiBrain as MobileAiBrain } from './brains/android-ai.js';
 export { CliBrain, claudeInvoker, parseDecision, type CliInvoker, type CliDecision } from './brains/cli.js';
 export { CliWebAgent } from './brains/cli-agent.js';
 export { AndroidCliAgent } from './brains/android-cli-agent.js';

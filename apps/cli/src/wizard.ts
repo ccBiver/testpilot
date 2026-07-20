@@ -3,9 +3,12 @@ import {
   runCases,
   runExplore,
   runExploreApp,
+  runExploreIos,
   runGenCases,
   type GenCasesOptions,
 } from './actions.js';
+
+const isMac = process.platform === 'darwin';
 
 const DEPTH_STEPS = { quick: 15, standard: 30, deep: 60 } as const;
 
@@ -43,9 +46,26 @@ async function wizardExplore(): Promise<void> {
     options: [
       { value: 'web', label: 'Web 网站' },
       { value: 'android', label: 'Android 应用', hint: '需已连接模拟器/真机' },
+      { value: 'ios', label: 'iOS 应用', hint: isMac ? '需 Xcode + 模拟器' : '仅 macOS,当前系统不支持' },
     ],
   });
   if (cancelled(platform)) return;
+
+  if (platform === 'ios') {
+    if (!isMac) {
+      p.outro('iOS 测试仅支持 macOS(需 Xcode + 模拟器 + WebDriverAgent)');
+      return;
+    }
+    const bundleId = await p.text({ message: 'App bundle id', placeholder: 'com.apple.Preferences' });
+    if (cancelled(bundleId)) return;
+    const goal = await p.text({ message: '探索目标(可选)', placeholder: '回车跳过' });
+    if (cancelled(goal)) return;
+    const depth = await pickDepth();
+    if (depth === null) return;
+    if (!(await confirmRun(`iOS 探索 ${String(bundleId)}`))) return;
+    await runExploreIos({ bundleId: String(bundleId), goal: goal ? String(goal) : undefined, steps: depth });
+    return;
+  }
 
   if (platform === 'android') {
     const pkg = await p.text({ message: '应用包名', placeholder: 'com.example.app' });

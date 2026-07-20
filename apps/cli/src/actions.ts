@@ -1,11 +1,12 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { AndroidExecutor, WebExecutor, type ExplorerTarget } from '@testpilot/executor';
+import { AndroidExecutor, IosExecutor, WebExecutor, type ExplorerTarget } from '@testpilot/executor';
 import { androidDetectors } from '@testpilot/detectors';
 import {
   AiBrain,
   AndroidAiBrain,
   AndroidCliAgent,
+  MobileAiBrain,
   CaseRunner,
   CliBrain,
   CliWebAgent,
@@ -94,6 +95,45 @@ export async function runExploreApp(opts: ExploreAppOptions): Promise<void> {
   });
 
   console.log(`📱 开始探索 App ${opts.pkg}(预算:${opts.steps} 步)\n`);
+  try {
+    const report = await explorer.run();
+    const htmlPath = path.join(outDir, 'report.html');
+    await writeFile(htmlPath, renderHtmlReport(report), 'utf8');
+    console.log(`\n✅ 完成:${report.stepsTaken} 步,发现 ${report.findings.length} 个缺陷`);
+    console.log(`📄 报告:${htmlPath}`);
+    if (report.findings.length > 0) process.exitCode = 2;
+  } finally {
+    await executor.dispose();
+  }
+}
+
+export interface ExploreIosOptions {
+  /** bundle id,如 com.apple.Preferences */
+  bundleId: string;
+  goal?: string;
+  steps: number;
+  device?: string;
+  out?: string;
+}
+
+/** iOS 自主探索(仅 macOS,视觉驱动需模型) */
+export async function runExploreIos(opts: ExploreIosOptions): Promise<void> {
+  const outDir = newOutDir(opts.out);
+  await mkdir(outDir, { recursive: true });
+
+  const executor = new IosExecutor({ deviceId: opts.device });
+  const brain = new MobileAiBrain(executor);
+  const explorer = new Explorer(executor, brain, {
+    targetUrl: opts.bundleId,
+    goal: opts.goal,
+    stepBudget: opts.steps,
+    outDir,
+    mode: 'ai',
+    platform: 'android', // 报告文案层面按移动端处理
+    onProgress: log,
+  });
+
+  console.log(`🍎 开始探索 iOS App ${opts.bundleId}(预算:${opts.steps} 步)\n`);
   try {
     const report = await explorer.run();
     const htmlPath = path.join(outDir, 'report.html');
