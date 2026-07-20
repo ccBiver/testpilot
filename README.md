@@ -33,6 +33,11 @@ pnpm install:cli    # 构建并把 testpilot 装为全局命令(软链到 ~/.loc
 # 需求文档 → 生成用例(纯文本,claude CLI)
 testpilot gen-cases requirements.md --target https://example.com --out cases.yaml
 
+# Figma 设计稿 → 生成用例(默认走 Figma 桌面 App 的 Dev Mode MCP,无需 token;
+# 先在 Figma 桌面开启 Dev Mode → Enable MCP server,并选中要测的画板)
+testpilot gen-cases --figma "https://figma.com/design/KEY/App?node-id=1-2" --target https://example.com
+# 无桌面 App 时改用个人令牌:export FIGMA_API_KEY=figd_xxx; 加 --figma-token
+
 # 执行用例(默认 --engine cli,用本机 claude;--engine midscene 用模型 key)
 testpilot run-cases cases.yaml
 
