@@ -5,6 +5,7 @@ import { androidDetectors } from '@testpilot/detectors';
 import {
   AiBrain,
   AndroidAiBrain,
+  AndroidCliAgent,
   CaseRunner,
   CliBrain,
   CliWebAgent,
@@ -173,13 +174,15 @@ export async function runCases(opts: RunCasesOptions): Promise<void> {
     target = new WebExecutor({ headless: !opts.headed });
   }
 
-  // CLI 引擎目前仅 Web 支持(依赖元素树);Android 用例走 midscene
-  const useCli = opts.engine === 'cli' && suite.platform === 'web';
-  const runner = new CaseRunner(target, suite, {
-    outDir,
-    agentFactory: useCli ? async (t) => new CliWebAgent(t as WebExecutor) : undefined,
-    onProgress: log,
-  });
+  // CLI 引擎:Web 用 CliWebAgent,Android 用 AndroidCliAgent(uiautomator 元素 + adb)
+  const useCli = opts.engine === 'cli';
+  const agentFactory = useCli
+    ? async (t: ExplorerTarget) =>
+        suite.platform === 'android'
+          ? new AndroidCliAgent(t as AndroidExecutor)
+          : new CliWebAgent(t as WebExecutor)
+    : undefined;
+  const runner = new CaseRunner(target, suite, { outDir, agentFactory, onProgress: log });
   console.log(`引擎:${useCli ? '本机 Claude CLI' : '多模态模型(midscene)'}`);
   console.log(`🧪 执行 ${suite.cases.length} 条用例 → ${suite.target}(${suite.platform})\n`);
   try {

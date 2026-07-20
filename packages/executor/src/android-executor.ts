@@ -134,6 +134,28 @@ export class AndroidExecutor implements ExplorerTarget {
     return this.agent;
   }
 
+  /** uiautomator dump 取可交互元素(文本/描述 + 中心坐标),供本机 CLI 大脑选择 */
+  async androidElements(): Promise<AndroidElement[]> {
+    await this.adbShell(['uiautomator', 'dump', '/sdcard/tp_ui.xml']).catch(() => '');
+    const xml = await this.adbShell(['cat', '/sdcard/tp_ui.xml']).catch(() => '');
+    return parseUiautomator(xml);
+  }
+
+  /** 点击屏幕坐标 */
+  async tap(x: number, y: number): Promise<void> {
+    await this.adbShell(['input', 'tap', String(x), String(y)]);
+  }
+
+  /** 在当前焦点输入文本(空格转 %s;中文需 IME,暂不支持) */
+  async typeText(text: string): Promise<void> {
+    await this.adbShell(['input', 'text', text.replace(/ /g, '%s')]);
+  }
+
+  /** 返回键 */
+  async back(): Promise<void> {
+    await this.adbShell(['input', 'keyevent', '4']);
+  }
+
   async dispose(): Promise<void> {
     this.logcat?.kill();
     this.logcat = null;
@@ -157,7 +179,7 @@ export class AndroidExecutor implements ExplorerTarget {
   private adbShell(args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
       const base = this.resolvedDeviceId ? ['-s', this.resolvedDeviceId] : [];
-      const proc = spawn('adb', [...base, 'shell', ...args], { timeout: 5000 });
+      const proc = spawn('adb', [...base, 'shell', ...args], { timeout: 10_000 });
       let out = '';
       proc.stdout.on('data', (d) => (out += d.toString()));
       proc.on('error', reject);
@@ -208,4 +230,46 @@ export class AndroidExecutor implements ExplorerTarget {
       });
     }
   }
+}
+
+/** uiautomator dump 出的可交互元素 */
+export interface AndroidElement {
+  /** 展示标签:text 优先,其次 content-desc */
+  label: string;
+  className: string;
+  clickable: boolean;
+  /** 中心坐标,用于 adb input tap */
+  center: [number, number];
+}
+
+/**
+ * 解析 uiautomator dump 的 XML,取有文本/描述且可点击(或输入类)的节点。
+ * 不引 XML 库,按 <node .../> 逐个正则提取属性。
+ */
+export function parseUiautomator(xml: string): AndroidElement[] {
+  const elements: AndroidElement[] = [];
+  const seen = new Set<string>();
+  for (const node of xml.match(/<node\b[^>]*?\/?>/g) ?? []) {
+    const attr = (name: string) => node.match(new RegExp(`${name}="([^"]*)"`))?.[1] ?? '';
+    const text = attr('text').trim();
+    const desc = attr('content-desc').trim();
+    const label = text || desc;
+    const className = attr('class');
+    const clickable = attr('clickable') === 'true';
+    const isInput = /EditText/i.test(className);
+    // 只保留有意义、能操作的元素
+    if (!label && !isInput) continue;
+    if (!clickable && !isInput) continue;
+
+    const bounds = attr('bounds').match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
+    if (!bounds) continue;
+    const [x1, y1, x2, y2] = [bounds[1], bounds[2], bounds[3], bounds[4]].map(Number) as [number, number, number, number];
+    const center: [number, number] = [Math.round((x1 + x2) / 2), Math.round((y1 + y2) / 2)];
+
+    const key = `${label}|${className}|${center[0]},${center[1]}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    elements.push({ label: label || `[${className.split('.').pop()}]`, className, clickable, center });
+  }
+  return elements;
 }

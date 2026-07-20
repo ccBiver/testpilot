@@ -4,6 +4,7 @@ export { AiBrain } from './brains/ai.js';
 export { AndroidAiBrain } from './brains/android-ai.js';
 export { CliBrain, claudeInvoker, parseDecision, type CliInvoker, type CliDecision } from './brains/cli.js';
 export { CliWebAgent } from './brains/cli-agent.js';
+export { AndroidCliAgent } from './brains/android-cli-agent.js';
 export { generateCasesFromDoc, parseCases, type CaseGenInput } from './case-gen.js';
 export type { Brain, BrainContext, StepPlan } from './brains/types.js';
 export { CaseRunner, type CaseRunnerOptions } from './case-runner.js';
