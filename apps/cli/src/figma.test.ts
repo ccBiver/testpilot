@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseFigmaUrl } from './figma.js';
+import { parseFigmaUrl, pickDesignTool } from './figma.js';
 
 describe('parseFigmaUrl', () => {
   it('解析 design 链接 + node-id', () => {
@@ -22,7 +22,29 @@ describe('parseFigmaUrl', () => {
     expect(parseFigmaUrl('https://figma.com/design/K/N?node-id=5%3A6').nodeId).toBe('5:6');
   });
 
-  it('非法输入抛错', () => {
-    expect(() => parseFigmaUrl('https://example.com/foo')).toThrow(/无法解析/);
+  it('非法输入 → fileKey 为空(不抛错,交由调用方判断)', () => {
+    expect(parseFigmaUrl('https://example.com/foo').fileKey).toBeUndefined();
+  });
+});
+
+describe('pickDesignTool', () => {
+  it('按优先级挑元数据类工具', () => {
+    expect(pickDesignTool([{ name: 'get_code' }, { name: 'get_metadata' }])).toBe('get_metadata');
+  });
+
+  it('官方无 metadata 时退到 get_code', () => {
+    expect(pickDesignTool([{ name: 'get_image' }, { name: 'get_code' }])).toBe('get_code');
+  });
+
+  it('token 版认 get_figma_data', () => {
+    expect(pickDesignTool([{ name: 'get_figma_data' }])).toBe('get_figma_data');
+  });
+
+  it('全不认时按关键词兜底', () => {
+    expect(pickDesignTool([{ name: 'fetch_design_json' }])).toBe('fetch_design_json');
+  });
+
+  it('空清单 → null', () => {
+    expect(pickDesignTool([])).toBeNull();
   });
 });

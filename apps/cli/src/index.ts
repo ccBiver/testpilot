@@ -114,7 +114,8 @@ program
   .command('gen-cases')
   .description('从需求文档或 Figma 设计稿生成测试用例(.yaml),用本机 Claude CLI(零 API 成本)')
   .argument('[doc]', '需求文档路径(.md/.txt);用 --figma 时可省略')
-  .option('--figma <url>', 'Figma 设计稿链接或 fileKey(经 Figma MCP,需 FIGMA_API_KEY)')
+  .option('--figma <url>', 'Figma 设计稿链接或 fileKey(经 Figma MCP;默认用桌面 App 授权,无需 token)')
+  .option('--figma-token', '改用个人令牌方式拉 Figma(需 FIGMA_API_KEY,无需桌面 App)', false)
   .requiredOption('-t, --target <target>', '被测目标:web 填 URL,android 填包名')
   .option('-p, --platform <platform>', '平台:web | android', 'web')
   .option('-o, --out <file>', '输出用例文件路径', 'cases.yaml')
@@ -125,9 +126,12 @@ program
     let doc: string;
     let kind: 'doc' | 'figma';
     if (opts.figma) {
-      console.log(`🎨 经 Figma MCP 拉取设计数据(${opts.figma})…`);
+      const source = opts.figmaToken ? 'token' : 'desktop';
+      console.log(
+        `🎨 经 Figma MCP 拉取设计数据(${source === 'desktop' ? '桌面授权,无需 token' : '个人令牌'})…`,
+      );
       const { fetchFigmaContext } = await import('./figma.js');
-      doc = await fetchFigmaContext(opts.figma);
+      doc = await fetchFigmaContext(opts.figma, { source });
       kind = 'figma';
     } else if (docPath) {
       doc = await readFile(path.resolve(docPath), 'utf8');
