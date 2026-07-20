@@ -14,7 +14,9 @@ import {
   HeuristicBrain,
   generateCasesFromDoc,
   renderCaseReport,
+  renderCaseMarkdown,
   renderHtmlReport,
+  renderMarkdownReport,
   type Brain,
 } from '@testpilot/engine';
 import { loadSuite } from './load-suite.js';
@@ -60,8 +62,10 @@ export async function runExplore(opts: ExploreOptions): Promise<void> {
     const report = await explorer.run();
     const htmlPath = path.join(outDir, 'report.html');
     await writeFile(htmlPath, renderHtmlReport(report), 'utf8');
+    await writeFile(path.join(outDir, 'report.md'), renderMarkdownReport(report), 'utf8');
     console.log(`\n✅ 完成:${report.stepsTaken} 步,覆盖 ${report.visitedUrls.length} 个页面,发现 ${report.findings.length} 个缺陷`);
     console.log(`📄 报告:${htmlPath}`);
+    console.log(`📝 Markdown:${htmlPath.replace(/\.html$/, '.md')}`);
     if (report.findings.length > 0) process.exitCode = 2;
   } finally {
     await executor.dispose();
@@ -99,8 +103,10 @@ export async function runExploreApp(opts: ExploreAppOptions): Promise<void> {
     const report = await explorer.run();
     const htmlPath = path.join(outDir, 'report.html');
     await writeFile(htmlPath, renderHtmlReport(report), 'utf8');
+    await writeFile(path.join(outDir, 'report.md'), renderMarkdownReport(report), 'utf8');
     console.log(`\n✅ 完成:${report.stepsTaken} 步,发现 ${report.findings.length} 个缺陷`);
     console.log(`📄 报告:${htmlPath}`);
+    console.log(`📝 Markdown:${htmlPath.replace(/\.html$/, '.md')}`);
     if (report.findings.length > 0) process.exitCode = 2;
   } finally {
     await executor.dispose();
@@ -138,8 +144,10 @@ export async function runExploreIos(opts: ExploreIosOptions): Promise<void> {
     const report = await explorer.run();
     const htmlPath = path.join(outDir, 'report.html');
     await writeFile(htmlPath, renderHtmlReport(report), 'utf8');
+    await writeFile(path.join(outDir, 'report.md'), renderMarkdownReport(report), 'utf8');
     console.log(`\n✅ 完成:${report.stepsTaken} 步,发现 ${report.findings.length} 个缺陷`);
     console.log(`📄 报告:${htmlPath}`);
+    console.log(`📝 Markdown:${htmlPath.replace(/\.html$/, '.md')}`);
     if (report.findings.length > 0) process.exitCode = 2;
   } finally {
     await executor.dispose();
@@ -229,8 +237,10 @@ export async function runCases(opts: RunCasesOptions): Promise<void> {
     const report = await runner.run();
     const htmlPath = path.join(outDir, 'cases.html');
     await writeFile(htmlPath, renderCaseReport(report), 'utf8');
+    await writeFile(path.join(outDir, 'cases.md'), renderCaseMarkdown(report), 'utf8');
     console.log(`\n✅ 完成:通过 ${report.passed} / 失败 ${report.failed} / 阻塞 ${report.blocked}(共 ${report.total})`);
     console.log(`📄 报告:${htmlPath}`);
+    console.log(`📝 Markdown:${htmlPath.replace(/\.html$/, '.md')}`);
     if (report.failed > 0) process.exitCode = 2;
   } finally {
     await target.dispose();

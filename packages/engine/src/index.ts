@@ -10,3 +10,4 @@ export type { Brain, BrainContext, StepPlan } from './brains/types.js';
 export { CaseRunner, type CaseRunnerOptions } from './case-runner.js';
 export { renderHtmlReport } from './report/html.js';
 export { renderCaseReport } from './report/case-html.js';
+export { renderMarkdownReport, renderCaseMarkdown } from './report/markdown.js';
