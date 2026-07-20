@@ -2,8 +2,10 @@ import type { TestCase, TestCaseSuite } from '@testpilot/shared';
 import { claudeInvoker, type CliInvoker } from './brains/cli.js';
 
 export interface CaseGenInput {
-  /** 需求文档正文(markdown/纯文本) */
+  /** 输入正文:需求文档原文,或从 Figma 提取的设计数据摘要 */
   doc: string;
+  /** 输入类型:doc 需求文档 / figma 设计稿(影响提示词措辞与用例 source) */
+  kind?: 'doc' | 'figma';
   /** 被测目标:web=URL,android=包名 */
   target: string;
   platform: 'web' | 'android';
@@ -22,15 +24,16 @@ export async function generateCasesFromDoc(
   invoke: CliInvoker = claudeInvoker,
 ): Promise<TestCaseSuite> {
   const maxCases = input.maxCases ?? 8;
+  const kind = input.kind ?? 'doc';
   const raw = await invoke(buildPrompt(input, maxCases));
   const cases = parseCases(raw);
   if (cases.length === 0) {
-    throw new Error('未能从文档生成用例:模型输出无法解析,请检查文档内容或重试');
+    throw new Error('未能生成用例:模型输出无法解析,请检查输入内容或重试');
   }
   return {
     target: input.target,
     platform: input.platform,
-    cases: cases.slice(0, maxCases).map((c, i) => ({ ...c, id: `case-${i + 1}`, source: 'doc' as const })),
+    cases: cases.slice(0, maxCases).map((c, i) => ({ ...c, id: `case-${i + 1}`, source: kind })),
   };
 }
 
@@ -40,9 +43,14 @@ function buildPrompt(input: CaseGenInput, maxCases: number): string {
     input.platform === 'android'
       ? '被测对象是 Android 应用,操作用「点击/输入/滑动/返回」等移动端动作。'
       : '被测对象是网页,操作用「点击/输入/打开链接」等 Web 动作。';
+  const isFigma = input.kind === 'figma';
+  const sourceLabel = isFigma ? '设计稿(Figma 提取的界面结构与文案)' : '需求文档';
+  const figmaTip = isFigma
+    ? '\n设计稿里主要是界面元素、文案、层级;请据此推断用户能做的操作和应看到的界面状态来设计用例。'
+    : '';
 
-  return `你是资深测试工程师。请根据下面的需求文档,设计一批端到端功能测试用例。
-${platformHint}${focusPart}
+  return `你是资深测试工程师。请根据下面的${sourceLabel},设计一批端到端功能测试用例。
+${platformHint}${figmaTip}${focusPart}
 
 要求:
 1. 每条用例聚焦一个可独立验证的功能点或用户流程;
@@ -55,7 +63,7 @@ ${platformHint}${focusPart}
 只输出一个 JSON 数组(不要 markdown 代码块、不要解释),格式:
 [{"name":"用例名","steps":[{"action":"操作","expect":"预期(可选)"}]}]
 
-需求文档:
+${sourceLabel}:
 """
 ${input.doc.slice(0, 12_000)}
 """`;

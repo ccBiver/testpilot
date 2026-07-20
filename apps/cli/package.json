@@ -13,11 +13,13 @@
   "scripts": {
     "explore": "tsx src/index.ts explore",
     "build": "tsup",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@midscene/android": "^1.10.4",
     "@midscene/web": "^0.30.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@playwright/test": "^1.61.1",
     "@testpilot/detectors": "workspace:*",
     "commander": "^13.1.0",
@@ -32,6 +34,7 @@
     "@types/node": "^26.1.1",
     "tsup": "^8.5.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.7"
   }
 }
