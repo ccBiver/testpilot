@@ -16,8 +16,11 @@
 - [x] 需求文档 → 用例生成(gen-cases,claude 纯文本),实测演示文档出 5 条用例
 - [x] CLI 命令齐:explore / explore-app / run-cases(--engine cli|midscene)/ gen-cases
 
+- [x] 全局命令:pnpm install:cli → testpilot 任意目录可用(软链 ~/.local/bin;2026-07-20)
+- [x] Figma MCP 接入:CLI 作 MCP 客户端 spawn figma-developer-mcp,get_figma_data 拉设计
+      → gen-cases --figma 生成用例;URL 解析已测,live 需 FIGMA_API_KEY(2026-07-20)
+
 ### 下一步
-- [ ] Figma MCP 接入:拉设计稿 → 生成用例(gen-cases 增加 --figma 来源)
 - [ ] Android 用例执行的 CLI 版(uiautomator 取元素 + adb 点击,现 Android 用例走 midscene)
 - [ ] 回归模式:多次运行对比、失败用例聚焦重跑
 - [ ] iOS 执行器(Midscene iOS,macOS + WebDriverAgent)
