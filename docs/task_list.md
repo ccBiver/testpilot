@@ -24,9 +24,12 @@
 - [x] Android 用例执行 CLI 版(2026-07-20):uiautomator 取元素 + adb 点击,
       AndroidCliAgent 零成本走 Claude 订阅;实测模拟器 dump+tap 生效
 
+- [x] iOS 执行器(2026-07-20,仅 macOS):IosExecutor(@midscene/ios + WDA),explore-ios
+      + 向导分支;视觉驱动需模型;前置需用户一次性构建 WebDriverAgent(:8100)
+
 ### 下一步
 - [ ] 回归模式:多次运行对比、失败用例聚焦重跑
-- [ ] iOS 执行器(Midscene iOS,macOS + WebDriverAgent)
+- [ ] iOS 崩溃检测(simctl 日志)+ 用例执行验证(需 WDA 起来实测)
 - [ ] CLI 打包发布(tsup 产物已就绪,npm publish 待定名)
 - [ ] 中文输入:adb input text 不支持中文,需 ADB keyboard IME(Android 用例填中文时)
 
