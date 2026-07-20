@@ -10,7 +10,7 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "tp": "pnpm --filter @ccbiver/testpilot exec tsx src/index.ts",
+    "tp": "pnpm --filter @biver/testpilot exec tsx src/index.ts",
     "install:cli": "bash scripts/install.sh"
   },
   "devDependencies": {

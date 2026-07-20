@@ -23,7 +23,7 @@
 发布后(npm,scoped 包,命令仍是 `testpilot`):
 
 ```bash
-npm i -g @ccbiver/testpilot     # 或免安装直跑:npx @ccbiver/testpilot
+npm i -g @biver/testpilot     # 或免安装直跑:npx @biver/testpilot
 testpilot                        # 任意目录
 ```
 
