@@ -93,8 +93,8 @@ export interface TestCaseStep {
 export interface TestCase {
   id: string;
   name: string;
-  /** 来源:manual 手写 / doc 需求文档 / figma 设计稿 */
-  source?: 'manual' | 'doc' | 'figma';
+  /** 来源:manual 手写 / doc 需求文档 / figma 设计稿 / both 文档+设计稿 */
+  source?: 'manual' | 'doc' | 'figma' | 'both';
   steps: TestCaseStep[];
 }
 

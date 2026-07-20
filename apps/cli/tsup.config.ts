@@ -15,6 +15,8 @@ export default defineConfig({
     '@modelcontextprotocol/sdk',
     '@clack/prompts',
     'commander',
+    'mammoth',
+    'pdf-parse-new',
     'yaml',
     'zod',
   ],

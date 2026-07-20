@@ -104,17 +104,27 @@ async function wizardExplore(): Promise<void> {
 }
 
 async function wizardGen(): Promise<void> {
-  const source = await p.select({
-    message: '用例从哪里生成?',
+  const sources = await p.multiselect({
+    message: '用例依据什么生成?(空格多选,功能 + UI 可一起)',
     options: [
-      { value: 'doc', label: '需求文档', hint: '.md / .txt 文件' },
-      { value: 'figma', label: 'Figma 设计稿', hint: '经 Figma MCP' },
+      { value: 'doc', label: '需求文档', hint: '功能规格 · .md/.txt/.pdf/.docx' },
+      { value: 'figma', label: 'Figma 设计稿', hint: 'UI 规格 · 经 Figma MCP' },
     ],
+    required: true,
   });
-  if (cancelled(source)) return;
+  if (cancelled(sources)) return;
+  const picked = sources as string[];
 
   const gen: Partial<GenCasesOptions> = {};
-  if (source === 'figma') {
+  if (picked.includes('doc')) {
+    const docPath = await p.text({
+      message: '需求文档路径(可把文件从访达拖进来)',
+      placeholder: 'requirements.md / .pdf / .docx',
+    });
+    if (cancelled(docPath)) return;
+    gen.docPath = String(docPath);
+  }
+  if (picked.includes('figma')) {
     const url = await p.text({ message: 'Figma 链接或 fileKey', placeholder: 'https://figma.com/design/...' });
     if (cancelled(url)) return;
     const auth = await p.select({
@@ -127,10 +137,6 @@ async function wizardGen(): Promise<void> {
     if (cancelled(auth)) return;
     gen.figma = String(url);
     gen.figmaSource = auth as 'desktop' | 'token';
-  } else {
-    const docPath = await p.text({ message: '需求文档路径', placeholder: 'requirements.md' });
-    if (cancelled(docPath)) return;
-    gen.docPath = String(docPath);
   }
 
   const platform = await p.select({

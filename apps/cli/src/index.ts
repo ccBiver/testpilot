@@ -62,8 +62,8 @@ program
 
 program
   .command('gen-cases')
-  .description('从需求文档或 Figma 设计稿生成测试用例(.yaml)')
-  .argument('[doc]', '需求文档路径(.md/.txt);用 --figma 时可省略')
+  .description('从需求文档和/或 Figma 设计稿生成测试用例(.yaml);两者可同时,功能+UI 都覆盖')
+  .argument('[doc]', '需求文档路径(.md/.txt/.pdf/.docx);可与 --figma 同时提供')
   .option('--figma <url>', 'Figma 链接或 fileKey(默认桌面 App 授权,无需 token)')
   .option('--figma-token', '改用个人令牌方式(需 FIGMA_API_KEY)', false)
   .requiredOption('-t, --target <target>', '被测目标:web 填 URL,android 填包名')

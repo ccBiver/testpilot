@@ -2,10 +2,10 @@ import type { TestCase, TestCaseSuite } from '@testpilot/shared';
 import { claudeInvoker, type CliInvoker } from './brains/cli.js';
 
 export interface CaseGenInput {
-  /** 输入正文:需求文档原文,或从 Figma 提取的设计数据摘要 */
+  /** 输入正文:需求文档原文、Figma 设计摘要,或二者合并(带小节标题) */
   doc: string;
-  /** 输入类型:doc 需求文档 / figma 设计稿(影响提示词措辞与用例 source) */
-  kind?: 'doc' | 'figma';
+  /** 输入类型:doc 功能文档 / figma 设计稿 / both 文档+设计稿(影响提示词与用例 source) */
+  kind?: 'doc' | 'figma' | 'both';
   /** 被测目标:web=URL,android=包名 */
   target: string;
   platform: 'web' | 'android';
@@ -43,14 +43,22 @@ function buildPrompt(input: CaseGenInput, maxCases: number): string {
     input.platform === 'android'
       ? '被测对象是 Android 应用,操作用「点击/输入/滑动/返回」等移动端动作。'
       : '被测对象是网页,操作用「点击/输入/打开链接」等 Web 动作。';
-  const isFigma = input.kind === 'figma';
-  const sourceLabel = isFigma ? '设计稿(Figma 提取的界面结构与文案)' : '需求文档';
-  const figmaTip = isFigma
-    ? '\n设计稿里主要是界面元素、文案、层级;请据此推断用户能做的操作和应看到的界面状态来设计用例。'
-    : '';
+  const kind = input.kind ?? 'doc';
+  const sourceLabel =
+    kind === 'both'
+      ? '需求文档(功能规格)与 Figma 设计稿(UI 规格)'
+      : kind === 'figma'
+        ? '设计稿(Figma 提取的界面结构与文案)'
+        : '需求文档';
+  const kindTip =
+    kind === 'both'
+      ? '\n需求文档描述功能与业务规则,设计稿描述界面元素与布局;请结合两者——既覆盖功能流程,也覆盖界面上应出现的元素/文案。'
+      : kind === 'figma'
+        ? '\n设计稿里主要是界面元素、文案、层级;请据此推断用户能做的操作和应看到的界面状态来设计用例。'
+        : '';
 
   return `你是资深测试工程师。请根据下面的${sourceLabel},设计一批端到端功能测试用例。
-${platformHint}${figmaTip}${focusPart}
+${platformHint}${kindTip}${focusPart}
 
 要求:
 1. 每条用例聚焦一个可独立验证的功能点或用户流程;
@@ -65,7 +73,7 @@ ${platformHint}${figmaTip}${focusPart}
 
 ${sourceLabel}:
 """
-${input.doc.slice(0, 12_000)}
+${input.doc.slice(0, 16_000)}
 """`;
 }
 

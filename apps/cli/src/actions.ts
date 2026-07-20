@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { AndroidExecutor, IosExecutor, WebExecutor, type ExplorerTarget } from '@testpilot/executor';
 import { androidDetectors } from '@testpilot/detectors';
@@ -155,9 +155,9 @@ export async function runExploreIos(opts: ExploreIosOptions): Promise<void> {
 }
 
 export interface GenCasesOptions {
-  /** 需求文档路径,与 figma 二选一 */
+  /** 需求文档路径(功能规格,.md/.txt/.pdf/.docx),可与 figma 同时提供 */
   docPath?: string;
-  /** Figma 链接/fileKey,与 docPath 二选一 */
+  /** Figma 链接/fileKey(UI 规格),可与 docPath 同时提供 */
   figma?: string;
   figmaSource?: 'desktop' | 'token';
   target: string;
@@ -167,26 +167,30 @@ export interface GenCasesOptions {
   focus?: string;
 }
 
-/** 从文档/Figma 生成用例,返回落盘路径 */
+/** 从需求文档 +/或 Figma 生成用例(可同时,功能+UI 合并),返回落盘路径 */
 export async function runGenCases(opts: GenCasesOptions): Promise<string> {
-  let doc: string;
-  let kind: 'doc' | 'figma';
+  const parts: string[] = [];
+
+  if (opts.docPath) {
+    const { readDoc } = await import('./read-doc.js');
+    console.log(`📄 读取需求文档:${opts.docPath}`);
+    parts.push(`【需求文档 · 功能规格】\n${await readDoc(opts.docPath)}`);
+  }
   if (opts.figma) {
     const source = opts.figmaSource ?? 'desktop';
     console.log(`🎨 经 Figma MCP 拉取设计数据(${source === 'desktop' ? '桌面授权,无需 token' : '个人令牌'})…`);
     const { fetchFigmaContext } = await import('./figma.js');
-    doc = await fetchFigmaContext(opts.figma, { source });
-    kind = 'figma';
-  } else if (opts.docPath) {
-    doc = await readFile(path.resolve(opts.docPath), 'utf8');
-    kind = 'doc';
-  } else {
-    throw new Error('请提供需求文档路径,或指定 Figma 设计稿');
+    parts.push(`【Figma 设计稿 · UI 规格】\n${await fetchFigmaContext(opts.figma, { source })}`);
+  }
+  if (parts.length === 0) {
+    throw new Error('请至少提供需求文档路径,或指定 Figma 设计稿(两者可同时提供)');
   }
 
+  const kind: 'doc' | 'figma' | 'both' =
+    opts.docPath && opts.figma ? 'both' : opts.docPath ? 'doc' : 'figma';
   console.log(`📝 生成用例(${opts.platform},来源 ${kind},本机 Claude CLI)…`);
   const suite = await generateCasesFromDoc({
-    doc,
+    doc: parts.join('\n\n'),
     kind,
     target: opts.target,
     platform: opts.platform,
