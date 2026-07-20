@@ -20,11 +20,15 @@
 - [x] Figma MCP 接入:CLI 作 MCP 客户端 spawn figma-developer-mcp,get_figma_data 拉设计
       → gen-cases --figma 生成用例;URL 解析已测,live 需 FIGMA_API_KEY(2026-07-20)
 
+- [x] 交互式向导(2026-07-20):直接 testpilot 问答式走完,深度/引擎/平台皆选择项
+- [x] Android 用例执行 CLI 版(2026-07-20):uiautomator 取元素 + adb 点击,
+      AndroidCliAgent 零成本走 Claude 订阅;实测模拟器 dump+tap 生效
+
 ### 下一步
-- [ ] Android 用例执行的 CLI 版(uiautomator 取元素 + adb 点击,现 Android 用例走 midscene)
 - [ ] 回归模式:多次运行对比、失败用例聚焦重跑
 - [ ] iOS 执行器(Midscene iOS,macOS + WebDriverAgent)
 - [ ] CLI 打包发布(tsup 产物已就绪,npm publish 待定名)
+- [ ] 中文输入:adb input text 不支持中文,需 ADB keyboard IME(Android 用例填中文时)
 
 ---
 
