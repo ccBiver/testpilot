@@ -3,8 +3,9 @@ import { existsSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import type { Signal } from '@testpilot/shared';
-import type { ExplorerTarget, TargetLocation, TargetObservation } from './target.js';
+import type { ModelConfig, Signal } from '@testpilot/shared';
+import { applyModelConfig } from './model-config.js';
+import type { AiAgent, ExplorerTarget, TargetLocation, TargetObservation } from './target.js';
 
 /** Midscene/appium-adb 依赖 ANDROID_HOME;未设置时探测默认 SDK 路径 */
 function ensureAndroidHome(): void {
@@ -27,6 +28,7 @@ export interface AndroidExecutorOptions {
 /** Midscene AndroidAgent 的最小接口(避免把重类型泄漏到本模块) */
 interface MidsceneAndroidAgent {
   aiAction(instruction: string): Promise<unknown>;
+  aiBoolean(question: string): Promise<boolean>;
   screenshotBase64(): Promise<string>;
 }
 interface MidsceneAndroidDevice {
@@ -121,6 +123,15 @@ export class AndroidExecutor implements ExplorerTarget {
     const out = this.signalBuffer;
     this.signalBuffer = [];
     return out;
+  }
+
+  /** Android agent 已在 launch 时创建;这里注入模型配置后返回 */
+  async createAgent(modelConfig?: ModelConfig): Promise<AiAgent> {
+    const mod = (await import('@midscene/android')) as unknown as {
+      overrideAIConfig: (c: Record<string, string>) => void;
+    };
+    applyModelConfig(modelConfig, mod.overrideAIConfig);
+    return this.agent;
   }
 
   async dispose(): Promise<void> {

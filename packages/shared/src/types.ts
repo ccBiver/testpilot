@@ -81,6 +81,66 @@ export interface Finding {
   at: number;
 }
 
+/** 测试用例的单步:一个自然语言动作 + 可选断言 */
+export interface TestCaseStep {
+  /** 要执行的操作,如「点击登录按钮」「在邮箱框输入 test@x.com」 */
+  action: string;
+  /** 该步执行后应满足的断言,如「页面出现验证码输入框」;省略则只执行不校验 */
+  expect?: string;
+}
+
+/** 一条测试用例(可手写、可由需求文档/Figma 生成) */
+export interface TestCase {
+  id: string;
+  name: string;
+  /** 来源:manual 手写 / doc 需求文档 / figma 设计稿 */
+  source?: 'manual' | 'doc' | 'figma';
+  steps: TestCaseStep[];
+}
+
+/** 用例文件:一批用例 + 被测目标 */
+export interface TestCaseSuite {
+  /** web=URL,android=包名 */
+  target: string;
+  platform: 'web' | 'android';
+  cases: TestCase[];
+}
+
+export type StepStatus = 'pass' | 'fail' | 'blocked';
+
+export interface StepResult {
+  action: string;
+  expect?: string;
+  status: StepStatus;
+  /** 断言判定说明或错误原因 */
+  detail?: string;
+  screenshotFile: string;
+  at: number;
+}
+
+export type CaseStatus = 'passed' | 'failed' | 'blocked';
+
+export interface CaseResult {
+  id: string;
+  name: string;
+  status: CaseStatus;
+  steps: StepResult[];
+}
+
+/** 用例回归运行报告 */
+export interface CaseRunReport {
+  runId: string;
+  target: string;
+  platform: 'web' | 'android';
+  startedAt: number;
+  finishedAt: number;
+  total: number;
+  passed: number;
+  failed: number;
+  blocked: number;
+  results: CaseResult[];
+}
+
 /** 一次运行的完整报告 */
 export interface RunReport {
   runId: string;

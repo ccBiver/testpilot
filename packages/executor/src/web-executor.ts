@@ -1,6 +1,7 @@
 import { chromium, type Browser, type Page } from 'playwright';
-import type { Signal } from '@testpilot/shared';
-import type { ExplorerTarget } from './target.js';
+import type { ModelConfig, Signal } from '@testpilot/shared';
+import { applyModelConfig } from './model-config.js';
+import type { AiAgent, ExplorerTarget } from './target.js';
 
 /** 页面上可交互的候选目标(供探索大脑决策) */
 export type Interactable =
@@ -212,6 +213,16 @@ export class WebExecutor implements ExplorerTarget {
   /** 当前位置(实现 ExplorerTarget) */
   async location(): Promise<{ url: string; title: string }> {
     return { url: this.page.url(), title: await this.page.title().catch(() => '') };
+  }
+
+  /** 创建 Midscene PlaywrightAgent(复用当前页面) */
+  async createAgent(modelConfig?: ModelConfig): Promise<AiAgent> {
+    const mod = (await import('@midscene/web/playwright')) as unknown as {
+      PlaywrightAgent: new (page: unknown) => AiAgent;
+      overrideAIConfig: (c: Record<string, string>) => void;
+    };
+    applyModelConfig(modelConfig, mod.overrideAIConfig);
+    return new mod.PlaywrightAgent(this.page);
   }
 
   async screenshot(filePath: string): Promise<void> {

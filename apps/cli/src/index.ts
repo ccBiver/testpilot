@@ -2,23 +2,27 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Command } from 'commander';
-import { AndroidExecutor, WebExecutor } from '@testpilot/executor';
+import { AndroidExecutor, WebExecutor, type ExplorerTarget } from '@testpilot/executor';
 import { androidDetectors } from '@testpilot/detectors';
 import {
   AiBrain,
   AndroidAiBrain,
+  CaseRunner,
   CliBrain,
   Explorer,
   HeuristicBrain,
+  renderCaseReport,
   renderHtmlReport,
   type Brain,
 } from '@testpilot/engine';
+import { loadSuite } from './load-suite.js';
 
 const program = new Command();
 
 program
   .name('testpilot')
-  .description('TestPilot — AI 自主探索测试 CLI(M0)');
+  .description('TestPilot — 本地 AI 测试工具:AI 自主探索 + 用例执行,支持 Web 与 Android')
+  .version('0.2.0');
 
 program
   .command('explore')
@@ -105,22 +109,39 @@ program
   });
 
 program
-  .command('runner')
-  .description('启动自托管 Runner:领取平台任务在本机执行(可用本机 claude 订阅与内网)')
-  .requiredOption('-t, --token <token>', 'Runner Token(控制台「设置」页创建,tpr_ 开头)')
-  .option('--server <url>', '平台地址', 'http://localhost:3100')
-  .option('--headed', '显示浏览器窗口,围观 AI 操作(默认后台无头执行)', false)
-  .action(async (opts) => {
-    const { ensureChromium } = await import('./ensure-browser.js');
-    ensureChromium();
-    const { Runner } = await import('./runner.js');
-    const runner = new Runner({ serverUrl: opts.server, token: opts.token, headed: opts.headed });
-    process.on('SIGINT', () => {
-      console.log('\n👋 Runner 退出');
-      runner.stop();
-      process.exit(0);
-    });
-    await runner.loop();
+  .command('run-cases')
+  .description('执行测试用例文件(.yaml/.json),Web 或 Android;需多模态模型')
+  .argument('<file>', '用例文件路径')
+  .option('-o, --out <dir>', '输出目录,默认 runs/<时间戳>')
+  .option('--headed', '显示浏览器窗口(仅 Web)', false)
+  .action(async (file: string, opts) => {
+    const suite = await loadSuite(path.resolve(file));
+    const outDir = path.resolve(
+      opts.out ?? path.join('runs', new Date().toISOString().replace(/[:.]/g, '-')),
+    );
+    await mkdir(outDir, { recursive: true });
+
+    let target: ExplorerTarget;
+    if (suite.platform === 'android') {
+      target = new AndroidExecutor();
+    } else {
+      const { ensureChromium } = await import('./ensure-browser.js');
+      ensureChromium();
+      target = new WebExecutor({ headless: !opts.headed });
+    }
+
+    const runner = new CaseRunner(target, suite, { outDir, onProgress: (m) => console.log(m) });
+    console.log(`🧪 执行 ${suite.cases.length} 条用例 → ${suite.target}(${suite.platform})\n`);
+    try {
+      const report = await runner.run();
+      const htmlPath = path.join(outDir, 'cases.html');
+      await writeFile(htmlPath, renderCaseReport(report), 'utf8');
+      console.log(`\n✅ 完成:通过 ${report.passed} / 失败 ${report.failed} / 阻塞 ${report.blocked}(共 ${report.total})`);
+      console.log(`📄 报告:${htmlPath}`);
+      if (report.failed > 0) process.exitCode = 2;
+    } finally {
+      await target.dispose();
+    }
   });
 
 program.parseAsync().catch((err) => {

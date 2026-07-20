@@ -1,19 +1,18 @@
 import type { ModelConfig } from '@testpilot/shared';
-import { checkGuardrail, type WebExecutor } from '@testpilot/executor';
+import { checkGuardrail, type AiAgent, type ExplorerTarget } from '@testpilot/executor';
 import type { Brain, BrainContext, StepPlan } from './types.js';
 
 /**
- * AI 大脑:基于 Midscene 视觉驱动探索。
- * 模型来源二选一:显式传入 ModelConfig(平台 BYOK,按用户注入),
- * 或进程环境变量(CLI 本地用法,见 .env.example)。
+ * AI 大脑:基于 Midscene 视觉驱动探索。agent 由执行器统一创建(Web/Android 通用),
+ * 模型来源为显式 ModelConfig 或进程环境变量。
  */
 export class AiBrain implements Brain {
   readonly name = 'ai';
-  private agent: MidsceneAgent | null = null;
+  private agent: AiAgent | null = null;
   private readonly actionHistory: string[] = [];
 
   constructor(
-    private readonly executor: WebExecutor,
+    private readonly executor: ExplorerTarget,
     private readonly modelConfig?: ModelConfig,
   ) {}
 
@@ -47,30 +46,8 @@ export class AiBrain implements Brain {
     );
   }
 
-  private async ensureAgent(): Promise<MidsceneAgent> {
-    if (this.agent) return this.agent;
-    if (!this.modelConfig && !process.env.OPENAI_API_KEY && !process.env.MIDSCENE_MODEL_NAME) {
-      throw new Error('AI 模式需要配置模型:平台端在「设置」里填写模型 Key,CLI 则配置环境变量');
-    }
-    const mod = (await import('@midscene/web/playwright')) as unknown as MidsceneModule;
-    if (this.modelConfig) {
-      mod.overrideAIConfig({
-        OPENAI_API_KEY: this.modelConfig.apiKey,
-        OPENAI_BASE_URL: this.modelConfig.baseUrl,
-        MIDSCENE_MODEL_NAME: this.modelConfig.modelName,
-        ...(this.modelConfig.vlMode === 'qwen' ? { MIDSCENE_USE_QWEN_VL: '1' } : {}),
-      });
-    }
-    this.agent = new mod.PlaywrightAgent(this.executor.page);
+  private async ensureAgent(): Promise<AiAgent> {
+    if (!this.agent) this.agent = await this.executor.createAgent(this.modelConfig);
     return this.agent;
   }
-}
-
-interface MidsceneModule {
-  PlaywrightAgent: new (page: unknown) => MidsceneAgent;
-  overrideAIConfig: (config: Record<string, string>) => void;
-}
-
-interface MidsceneAgent {
-  aiAction(instruction: string): Promise<unknown>;
 }

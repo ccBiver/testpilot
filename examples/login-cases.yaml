@@ -1,0 +1,21 @@
+# TestPilot 用例文件示例
+# 运行:testpilot run-cases examples/login-cases.yaml
+# platform: web | android;target: web 填 URL,android 填包名
+target: https://example.com/
+platform: web
+
+cases:
+  - name: 首页正常加载
+    steps:
+      - action: 打开首页
+        expect: 页面显示了标题文字
+
+  - name: 注册流程
+    steps:
+      - action: 点击「注册」入口
+        expect: 出现注册表单
+      - action: 在邮箱输入框填入 test@example.com
+      - action: 在密码框填入 password123
+        expect: 密码以掩码显示
+      - action: 点击提交按钮
+        expect: 提示注册成功或跳转到下一步

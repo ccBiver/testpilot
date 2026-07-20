@@ -1,31 +1,27 @@
 import type { ModelConfig } from '@testpilot/shared';
-import { checkGuardrail, type AndroidExecutor } from '@testpilot/executor';
+import { checkGuardrail, type AiAgent, type ExplorerTarget } from '@testpilot/executor';
 import type { Brain, BrainContext, StepPlan } from './types.js';
-
-interface AndroidAgentLike {
-  aiAction(instruction: string): Promise<unknown>;
-}
 
 /**
  * Android AI 大脑:视觉驱动,每步让多模态模型规划一个「像真实用户」的 App 操作。
- * 复用 AndroidExecutor 已连接的 Midscene AndroidAgent;模型配置经 overrideAIConfig 注入。
+ * agent 由执行器统一创建(含模型配置注入)。
  */
 export class AndroidAiBrain implements Brain {
   readonly name = 'android-ai';
+  private agent: AiAgent | null = null;
   private readonly actionHistory: string[] = [];
-  private configured = false;
 
   constructor(
-    private readonly executor: AndroidExecutor,
+    private readonly executor: ExplorerTarget,
     private readonly modelConfig?: ModelConfig,
   ) {}
 
   async nextStep(obs: Parameters<Brain['nextStep']>[0], ctx: BrainContext): Promise<StepPlan | null> {
-    await this.ensureModelConfig();
+    if (!this.agent) this.agent = await this.executor.createAgent(this.modelConfig);
     const instruction = this.buildInstruction(obs.pageTitle, ctx);
     if (!checkGuardrail(instruction).allowed) return null;
 
-    const agent = this.executor.agent as AndroidAgentLike;
+    const agent = this.agent;
     return {
       description: `AI 探索:${instruction}`,
       execute: async () => {
@@ -47,25 +43,5 @@ export class AndroidAiBrain implements Brain {
       `请执行一个此前没做过、最有价值的单步操作(点击、输入、滑动或返回),` +
       `优先走完核心业务流程。严禁支付、删除、发送等不可逆操作。`
     );
-  }
-
-  private async ensureModelConfig(): Promise<void> {
-    if (this.configured) return;
-    this.configured = true;
-    if (!this.modelConfig) {
-      if (!process.env.OPENAI_API_KEY && !process.env.MIDSCENE_MODEL_NAME) {
-        throw new Error('Android AI 探索需要配置多模态模型:平台后台配置,或 CLI 设环境变量');
-      }
-      return;
-    }
-    const mod = (await import('@midscene/android')) as unknown as {
-      overrideAIConfig: (c: Record<string, string>) => void;
-    };
-    mod.overrideAIConfig({
-      OPENAI_API_KEY: this.modelConfig.apiKey,
-      OPENAI_BASE_URL: this.modelConfig.baseUrl,
-      MIDSCENE_MODEL_NAME: this.modelConfig.modelName,
-      ...(this.modelConfig.vlMode === 'qwen' ? { MIDSCENE_USE_QWEN_VL: '1' } : {}),
-    });
   }
 }
