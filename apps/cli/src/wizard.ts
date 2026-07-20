@@ -1,5 +1,11 @@
 import * as p from '@clack/prompts';
 import {
+  foregroundAndroidApp,
+  listAndroidApps,
+  listBootedIosApps,
+  type DeviceApp,
+} from '@testpilot/executor';
+import {
   runCases,
   runExplore,
   runExploreApp,
@@ -56,26 +62,26 @@ async function wizardExplore(): Promise<void> {
       p.outro('iOS 测试仅支持 macOS(需 Xcode + 模拟器 + WebDriverAgent)');
       return;
     }
-    const bundleId = await p.text({ message: 'App bundle id', placeholder: 'com.apple.Preferences' });
-    if (cancelled(bundleId)) return;
+    const bundleId = await pickIosApp();
+    if (bundleId === null) return;
     const goal = await p.text({ message: '探索目标(可选)', placeholder: '回车跳过' });
     if (cancelled(goal)) return;
     const depth = await pickDepth();
     if (depth === null) return;
-    if (!(await confirmRun(`iOS 探索 ${String(bundleId)}`))) return;
-    await runExploreIos({ bundleId: String(bundleId), goal: goal ? String(goal) : undefined, steps: depth });
+    if (!(await confirmRun(`iOS 探索 ${bundleId}`))) return;
+    await runExploreIos({ bundleId, goal: goal ? String(goal) : undefined, steps: depth });
     return;
   }
 
   if (platform === 'android') {
-    const pkg = await p.text({ message: '应用包名', placeholder: 'com.example.app' });
-    if (cancelled(pkg)) return;
+    const pkg = await pickAndroidApp();
+    if (pkg === null) return;
     const goal = await p.text({ message: '探索目标(可选)', placeholder: '重点测试注册流程,回车跳过' });
     if (cancelled(goal)) return;
     const depth = await pickDepth();
     if (depth === null) return;
-    if (!(await confirmRun(`Android 探索 ${String(pkg)}`))) return;
-    await runExploreApp({ pkg: String(pkg), goal: goal ? String(goal) : undefined, steps: depth });
+    if (!(await confirmRun(`Android 探索 ${pkg}`))) return;
+    await runExploreApp({ pkg, goal: goal ? String(goal) : undefined, steps: depth });
     return;
   }
 
@@ -178,13 +184,59 @@ async function pickTargetAndPlatform(): Promise<{ target: string; platform: 'web
     ],
   });
   if (cancelled(platform)) return null;
-  const target = await p.text({
-    message: platform === 'android' ? '应用包名' : '网站地址',
-    placeholder: platform === 'android' ? 'com.example.app' : 'https://example.com',
+  if (platform === 'android') {
+    const pkg = await pickAndroidApp();
+    return pkg === null ? null : { target: pkg, platform: 'android' };
+  }
+  const url = await p.text({ message: '网站地址', placeholder: 'https://example.com', validate: reqUrl });
+  if (cancelled(url)) return null;
+  return { target: String(url), platform: 'web' };
+}
+
+/** 从连接的 Android 设备选 App(当前前台 / 已装列表 / 手动),返回包名 */
+async function pickAndroidApp(): Promise<string | null> {
+  const s = p.spinner();
+  s.start('读取设备上的应用…');
+  const [fg, apps] = await Promise.all([foregroundAndroidApp(), listAndroidApps()]);
+  s.stop(apps.length ? `设备上有 ${apps.length} 个应用` : '未读到应用(可手动输入)');
+  return chooseApp(fg ? { id: fg, name: '当前打开的应用' } : null, apps, '应用包名', 'com.example.app');
+}
+
+/** 从已启动 iOS 模拟器选 App(用户应用列表 / 手动),返回 bundle id */
+async function pickIosApp(): Promise<string | null> {
+  const s = p.spinner();
+  s.start('读取模拟器上的应用…');
+  const apps = await listBootedIosApps();
+  s.stop(apps.length ? `模拟器上有 ${apps.length} 个用户应用` : '未读到用户应用(可手动输入)');
+  return chooseApp(null, apps, 'App bundle id', 'com.apple.Preferences');
+}
+
+/** 通用应用选择:前台优先 + 列表 + 手动输入 */
+async function chooseApp(
+  foreground: DeviceApp | null,
+  apps: DeviceApp[],
+  manualLabel: string,
+  manualPlaceholder: string,
+): Promise<string | null> {
+  const options: { value: string; label: string; hint?: string }[] = [];
+  if (foreground) options.push({ value: foreground.id, label: `⭐ ${foreground.name}`, hint: foreground.id });
+  for (const a of apps) {
+    if (foreground && a.id === foreground.id) continue;
+    options.push({ value: a.id, label: a.name ? `${a.name}` : a.id, hint: a.name ? a.id : undefined });
+  }
+  options.push({ value: '__manual__', label: '✍️ 手动输入包名 / bundle id' });
+
+  const pick = await p.select({ message: '测哪个 App?', options, maxItems: 12 });
+  if (cancelled(pick)) return null;
+  if (pick !== '__manual__') return String(pick);
+
+  const manual = await p.text({
+    message: manualLabel,
+    placeholder: manualPlaceholder,
     validate: (v) => (!v ? '不能为空' : undefined),
   });
-  if (cancelled(target)) return null;
-  return { target: String(target), platform: platform as 'web' | 'android' };
+  if (cancelled(manual)) return null;
+  return String(manual);
 }
 
 async function pickDepth(): Promise<number | null> {
