@@ -1,5 +1,5 @@
 // CLI 入口:testpilot explore <url> | testpilot runner --token(shebang 由 tsup banner 注入)
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Command } from 'commander';
 import { AndroidExecutor, WebExecutor, type ExplorerTarget } from '@testpilot/executor';
@@ -12,6 +12,7 @@ import {
   CliWebAgent,
   Explorer,
   HeuristicBrain,
+  generateCasesFromDoc,
   renderCaseReport,
   renderHtmlReport,
   type Brain,
@@ -107,6 +108,33 @@ program
     } finally {
       await executor.dispose();
     }
+  });
+
+program
+  .command('gen-cases')
+  .description('从需求文档生成测试用例(.yaml),用本机 Claude CLI(零 API 成本)')
+  .argument('<doc>', '需求文档路径(.md/.txt)')
+  .requiredOption('-t, --target <target>', '被测目标:web 填 URL,android 填包名')
+  .option('-p, --platform <platform>', '平台:web | android', 'web')
+  .option('-o, --out <file>', '输出用例文件路径', 'cases.yaml')
+  .option('-n, --max <n>', '最多生成用例数', '8')
+  .option('-f, --focus <focus>', '侧重描述,如「重点覆盖注册与支付」')
+  .action(async (docPath: string, opts) => {
+    const doc = await readFile(path.resolve(docPath), 'utf8');
+    const platform = opts.platform === 'android' ? 'android' : 'web';
+    console.log(`📝 从 ${docPath} 生成用例(${platform},本机 Claude CLI)…`);
+    const suite = await generateCasesFromDoc({
+      doc,
+      target: opts.target,
+      platform,
+      maxCases: Number(opts.max) || 8,
+      focus: opts.focus,
+    });
+    const { stringify } = await import('yaml');
+    const outPath = path.resolve(opts.out);
+    await writeFile(outPath, stringify(suite), 'utf8');
+    console.log(`✅ 生成 ${suite.cases.length} 条用例 → ${outPath}`);
+    console.log(`   下一步:testpilot run-cases ${opts.out}`);
   });
 
 program
