@@ -17,7 +17,7 @@ const STEP_TIMEOUT_MS = 90_000;
 /** 默认决策器:调本机 claude CLI 无头模式,允许 Read 工具查看截图 */
 export const claudeInvoker: CliInvoker = (prompt) =>
   new Promise((resolve, reject) => {
-    execFile(
+    const child = execFile(
       'claude',
       ['-p', prompt, '--allowedTools', 'Read'],
       { timeout: STEP_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024 },
@@ -32,6 +32,9 @@ export const claudeInvoker: CliInvoker = (prompt) =>
         resolve(stdout);
       },
     );
+    // 立刻给 stdin 送 EOF:提示词已用 -p 传入,不再从管道读输入。
+    // 否则 claude 无头模式会等待 stdin,3 秒后告警「no stdin data received」甚至失败。
+    child.stdin?.end();
   });
 
 /**
