@@ -146,6 +146,10 @@ async function wizardGen(): Promise<void> {
     gen.figmaSource = auth as 'desktop' | 'token';
   }
 
+  const precondition = await pickPrecondition();
+  if (precondition === null) return;
+  if (precondition) gen.precondition = precondition;
+
   const out = await p.text({ message: '用例文件保存到', placeholder: 'cases.yaml', defaultValue: 'cases.yaml' });
   if (cancelled(out)) return;
 
@@ -261,6 +265,32 @@ async function chooseApp(
   });
   if (cancelled(manual)) return null;
   return String(manual);
+}
+
+/**
+ * 生成用例时的「起始状态」:决定用例是否包含登录步骤。
+ * 返回一句描述给模型;返回 '' 表示不指定;null 表示取消。
+ */
+async function pickPrecondition(): Promise<string | null> {
+  const state = await p.select({
+    message: '被测应用现在处于什么状态?(决定用例是否包含登录步骤)',
+    options: [
+      { value: 'logged-in', label: '已登录', hint: '跳过登录,用例直接从主页进功能(测已登录后的流程选这个)' },
+      { value: 'logged-out', label: '未登录', hint: '用例包含打开应用 → 登录步骤(适合测登录/注册本身)' },
+      { value: 'custom', label: '自定义前置条件…', hint: '如「已登录且已实名,账户有余额」' },
+    ],
+    initialValue: 'logged-in',
+  });
+  if (cancelled(state)) return null;
+  if (state === 'logged-in') return '应用已登录,当前停在已登录的主界面';
+  if (state === 'logged-out') return '应用未登录,从打开应用/登录页开始';
+  const custom = await p.text({
+    message: '描述起始状态',
+    placeholder: '已登录,账户有余额,停在合约交易页',
+    validate: (v) => (!v ? '不能为空(或返回上一步选预设)' : undefined),
+  });
+  if (cancelled(custom)) return null;
+  return String(custom);
 }
 
 async function pickDepth(): Promise<number | null> {

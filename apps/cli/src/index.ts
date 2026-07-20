@@ -69,6 +69,7 @@ program
   .option('-o, --out <file>', '输出用例文件路径', 'cases.yaml')
   .option('-n, --max <n>', '最多生成用例数', '8')
   .option('-f, --focus <focus>', '侧重描述')
+  .option('-s, --state <state>', '起始状态,如「已登录,从主页开始」;决定是否生成登录步骤')
   .action(async (docPath: string | undefined, opts) => {
     await runGenCases({
       docPath,
@@ -77,6 +78,7 @@ program
       out: opts.out,
       max: Number(opts.max) || 8,
       focus: opts.focus,
+      precondition: opts.state,
     });
     console.log(`   下一步:testpilot run-cases ${opts.out} -t <URL/包名>`);
   });

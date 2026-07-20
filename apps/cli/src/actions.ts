@@ -163,6 +163,8 @@ export interface GenCasesOptions {
   out: string;
   max?: number;
   focus?: string;
+  /** 起始状态,如「已登录,从主页开始」;决定是否生成登录步骤 */
+  precondition?: string;
 }
 
 /** 从需求文档 +/或 Figma 生成用例(可同时,功能+UI 合并),返回落盘路径 */
@@ -192,6 +194,7 @@ export async function runGenCases(opts: GenCasesOptions): Promise<string> {
     kind,
     maxCases: opts.max ?? 8,
     focus: opts.focus,
+    precondition: opts.precondition,
   });
   const { stringify } = await import('yaml');
   const outPath = path.resolve(opts.out);

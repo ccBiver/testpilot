@@ -61,4 +61,20 @@ describe('generateCasesFromDoc', () => {
     expect(prompt).toContain('重点测支付');
     expect(prompt).toContain('DOC');
   });
+
+  it('给了起始状态 → prompt 注入前置状态并要求跳过登录', async () => {
+    const invoke = vi.fn(async (_prompt: string) => '[{"name":"x","steps":[{"action":"y"}]}]');
+    await generateCasesFromDoc({ doc: 'DOC', precondition: '应用已登录,停在主界面' }, invoke);
+    const prompt = invoke.mock.calls[0]?.[0] ?? '';
+    expect(prompt).toContain('应用已登录,停在主界面');
+    expect(prompt).toContain('起始状态');
+    expect(prompt).toContain('跳过');
+  });
+
+  it('无起始状态 → prompt 不含前置状态小节', async () => {
+    const invoke = vi.fn(async (_prompt: string) => '[{"name":"x","steps":[{"action":"y"}]}]');
+    await generateCasesFromDoc({ doc: 'DOC' }, invoke);
+    const prompt = invoke.mock.calls[0]?.[0] ?? '';
+    expect(prompt).not.toContain('起始状态');
+  });
 });

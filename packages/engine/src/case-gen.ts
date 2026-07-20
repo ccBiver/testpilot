@@ -10,6 +10,8 @@ export interface CaseGenInput {
   maxCases?: number;
   /** 补充侧重,如「重点覆盖注册与支付流程」 */
   focus?: string;
+  /** 前置/起始状态,如「已登录,从主页开始」;影响是否生成登录步骤 */
+  precondition?: string;
 }
 
 /**
@@ -35,6 +37,11 @@ export async function generateCasesFromDoc(
 
 function buildPrompt(input: CaseGenInput, maxCases: number): string {
   const focusPart = input.focus ? `\n特别侧重:${input.focus}` : '';
+  const precondition = input.precondition?.trim();
+  const preconditionPart = precondition
+    ? `\n\n起始状态(所有用例都从这里开始):${precondition}
+据此判断是否需要登录步骤:若起始状态已登录,所有用例都跳过打开应用/输账号/登录这些步骤,第一步直接从「已登录的主界面」开始进入功能;只有当用例本身就是测「登录/注册」时才写登录步骤。`
+    : '';
   const platformHint =
     '操作用自然语言描述用户动作(点击、输入、滑动、返回等),尽量与具体平台无关,同一批用例既能跑网页也能跑 App。';
   const kind = input.kind ?? 'doc';
@@ -52,7 +59,7 @@ function buildPrompt(input: CaseGenInput, maxCases: number): string {
         : '';
 
   return `你是资深测试工程师。请根据下面的${sourceLabel},设计一批端到端功能测试用例。
-${platformHint}${kindTip}${focusPart}
+${platformHint}${kindTip}${focusPart}${preconditionPart}
 
 要求:
 1. 每条用例聚焦一个可独立验证的功能点或用户流程;
