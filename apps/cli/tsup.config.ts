@@ -13,6 +13,7 @@ export default defineConfig({
     '@midscene/android',
     '@playwright/test',
     '@modelcontextprotocol/sdk',
+    '@clack/prompts',
     'commander',
     'yaml',
     'zod',

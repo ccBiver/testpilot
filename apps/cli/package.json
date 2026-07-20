@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@clack/prompts": "^1.7.0",
     "@midscene/android": "^1.10.4",
     "@midscene/web": "^0.30.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
