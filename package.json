@@ -10,7 +10,8 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "tp": "pnpm --filter testpilot-cli exec tsx src/index.ts"
+    "tp": "pnpm --filter testpilot-cli exec tsx src/index.ts",
+    "install:cli": "bash scripts/install.sh"
   },
   "devDependencies": {
     "typescript": "^5.8.0",

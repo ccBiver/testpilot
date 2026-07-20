@@ -15,28 +15,47 @@
 - **双端**:Web(Playwright)+ Android(adb 模拟器/真机);统一的探索循环与报告。
 - **安全护栏**:支付、删除、发送等不可逆操作自动拦截。
 
-## 快速开始
+## 安装
 
 ```bash
 pnpm install
+pnpm install:cli    # 构建并把 testpilot 装为全局命令(软链到 ~/.local/bin)
+```
 
-# 配置多模态模型(AI 探索/用例执行需要;推荐 DashScope Qwen-VL)
+之后在任意目录直接用 `testpilot`。改了源码后重跑 `pnpm install:cli` 即可更新。
+(开发时也可免构建直跑:`pnpm tp <command>`)
+
+## 快速开始
+
+默认用本机 **Claude Code CLI** 驱动,零 API 成本(走你的订阅)。也可切多模态模型 key。
+
+```bash
+# 需求文档 → 生成用例(纯文本,claude CLI)
+testpilot gen-cases requirements.md --target https://example.com --out cases.yaml
+
+# 执行用例(默认 --engine cli,用本机 claude;--engine midscene 用模型 key)
+testpilot run-cases cases.yaml
+
+# AI 自主探索网站
+testpilot explore https://example.com --steps 20 --goal "测试注册流程" --mode cli
+
+# 探索本机 Android 应用(需已启动模拟器/连接真机)
+testpilot explore-app com.example.app --steps 20
+```
+
+启发式探索(纯爬行,连模型都不用)可作为冒烟:`testpilot explore <url> --mode heuristic`。
+
+### 可选:用多模态模型替代本机 CLI
+
+批量回归赶时间时,配 DashScope Qwen-VL 更快(claude CLI 每步要起进程,较慢):
+
+```bash
 export OPENAI_API_KEY=sk-xxx
 export OPENAI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 export MIDSCENE_MODEL_NAME=qwen-vl-max-latest
 export MIDSCENE_USE_QWEN_VL=1
-
-# AI 探索一个网站
-pnpm tp explore https://example.com --steps 20 --goal "测试注册流程"
-
-# 探索本机 Android 应用(需已启动模拟器/连接真机)
-pnpm tp explore-app com.example.app --steps 20
-
-# 执行用例文件(见 examples/login-cases.yaml)
-pnpm tp run-cases examples/login-cases.yaml
+testpilot run-cases cases.yaml --engine midscene
 ```
-
-启发式探索(纯爬行,零模型成本)可作为冒烟:`pnpm tp explore <url> --mode heuristic`。
 
 ## 用例文件格式
 
