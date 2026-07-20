@@ -4,8 +4,8 @@
 既能自主探索发现缺陷,也能执行你写的、或由需求文档与 Figma 生成的测试用例,
 产出带截图和复现步骤的 HTML / Markdown 报告。Web 与 Android 用本机 Claude 订阅驱动,零 API 成本。
 
-> **📄 宣传与教程页**:[docs/site.html](docs/site.html)(下载后浏览器打开,或本地 `open docs/site.html`)——
-> 座舱雷达风格,含交互向导演示与三端平台状态。
+> **📄 宣传与教程页**:本地 `open docs/index.html`;推到 GitHub 后经 Pages 在线访问
+> `https://<用户名>.github.io/<仓库名>/`(见下方「发布宣传页」)——座舱雷达风格,含交互向导演示与三端平台状态。
 
 > 2026-07 起从多租户 SaaS 平台重定位为纯 CLI 本地工具。历史平台代码见 git 历史。
 
@@ -94,8 +94,23 @@ packages/
   shared/     类型、缺陷指纹、用例/报告模型
   executor/   WebExecutor(Playwright)+ AndroidExecutor(adb)+ 统一 ExplorerTarget/AiAgent
   detectors/  缺陷检测器(console/network/crash · logcat)
-  engine/     Explorer(自主探索)+ CaseRunner(用例执行)+ HTML 报告
+  engine/     Explorer(自主探索)+ CaseRunner(用例执行)+ 文档/Figma 生成用例 + HTML/MD 报告
 apps/
-  cli/        testpilot 命令行(explore / explore-app / run-cases)
+  cli/        testpilot 命令行(交互向导 + explore / explore-app / explore-ios / gen-cases / run-cases)
 examples/     用例文件示例
+docs/         宣传页(index.html)+ PRD / 架构 / 任务清单
 ```
+
+## 发布宣传页(GitHub Pages)
+
+宣传页在 `docs/index.html`,已配好自动部署工作流 `.github/workflows/pages.yml`。推到 GitHub 后:
+
+1. 推送到 GitHub(仓库需为 public,或 Pages 已在你的账号计划内):
+   ```bash
+   git remote add origin git@github.com:<用户名>/<仓库名>.git
+   git push -u origin main
+   ```
+2. 仓库 **Settings → Pages → Source** 选 **GitHub Actions**(工作流会自动启用 Pages 并部署)。
+3. 部署完成后访问 `https://<用户名>.github.io/<仓库名>/`。
+
+之后每次改动 `docs/` 推上去都会自动重新发布。
