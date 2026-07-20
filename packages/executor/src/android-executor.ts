@@ -144,7 +144,21 @@ export class AndroidExecutor implements ExplorerTarget {
 
   /** 点击屏幕坐标 */
   async tap(x: number, y: number): Promise<void> {
-    await this.adbShell(['input', 'tap', String(x), String(y)]);
+    await this.adbShell(['input', 'tap', String(Math.round(x)), String(Math.round(y))]);
+  }
+
+  /** 滑动(Flutter 滚动列表等) */
+  async swipe(x1: number, y1: number, x2: number, y2: number, ms = 300): Promise<void> {
+    await this.adbShell(
+      ['input', 'swipe', x1, y1, x2, y2, ms].map((n) => String(Math.round(Number(n)))),
+    );
+  }
+
+  /** 屏幕物理像素尺寸(截图与 adb 输入用同一坐标系) */
+  async screenSize(): Promise<{ width: number; height: number }> {
+    const out = await this.adbShell(['wm', 'size']).catch(() => '');
+    const m = out.match(/(?:Override|Physical) size:\s*(\d+)x(\d+)/) ?? out.match(/(\d+)x(\d+)/);
+    return { width: Number(m?.[1] ?? 1080), height: Number(m?.[2] ?? 1920) };
   }
 
   /** 在当前焦点输入文本(空格转 %s;中文需 IME,暂不支持) */
