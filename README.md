@@ -2,25 +2,26 @@
 
 [![npm](https://img.shields.io/npm/v/@biver/testpilot?color=5eead4&label=%40biver%2Ftestpilot)](https://www.npmjs.com/package/@biver/testpilot)
 [![node](https://img.shields.io/node/v/@biver/testpilot?color=5eead4)](https://www.npmjs.com/package/@biver/testpilot)
-[![license](https://img.shields.io/npm/l/@biver/testpilot?color=5eead4)](./LICENSE)
+[![license](https://img.shields.io/badge/license-MIT-5eead4)](./LICENSE)
 
 本地优先的 AI 测试工具。在你自己的电脑上,让 AI 像真实用户一样测试你的 **Web / Android / iOS 应用**:
 既能自主探索发现缺陷,也能执行你写的、或由需求文档与 Figma 生成的测试用例,
 产出带截图和复现步骤的 HTML / Markdown 报告。Web 与 Android 用本机 Claude 订阅驱动,零 API 成本。
 
-> **📄 宣传与教程页**:本地 `open docs/index.html`;推到 GitHub 后经 Pages 在线访问
-> `https://<用户名>.github.io/<仓库名>/`(见下方「发布宣传页」)——座舱雷达风格,含交互向导演示与三端平台状态。
+> **📄 宣传与教程页**:<https://ccbiver.github.io/testpilot/>(座舱雷达风格,含交互向导演示与三端平台状态);
+> 本地也可 `open docs/index.html`。
 
 > 2026-07 起从多租户 SaaS 平台重定位为纯 CLI 本地工具。历史平台代码见 git 历史。
 
 ## 能力
 
 - **AI 自主探索**:给一个 URL 或 App 包名,AI 自动点击、输入、走流程,发现崩溃、报错、
-  接口异常、ANR 等缺陷。
-- **用例执行**:用 YAML/JSON 写测试用例(动作 + 断言),AI 逐条执行并判定通过/失败/阻塞。
-- **文档 → 用例**(建设中):导入需求文档 / Figma(经 Figma MCP)自动生成测试用例。
-- **双端**:Web(Playwright)+ Android(adb 模拟器/真机);统一的探索循环与报告。
-- **安全护栏**:支付、删除、发送等不可逆操作自动拦截。
+  接口异常、ANR 等缺陷,每个缺陷带截图与复现步骤。
+- **文档 / Figma → 用例**:导入需求文档,或经 Figma MCP 拉设计稿,自动生成结构化测试用例。
+- **用例执行**:YAML/JSON 用例逐条执行,AI 判定通过 / 失败 / 阻塞,出通过率报告。
+- **三端**:Web(Playwright)+ Android(adb)+ iOS(WebDriverAgent,仅 macOS);统一探索循环与报告。
+- **零 API 成本**:Web / Android 用本机 Claude 订阅驱动;赶时间可切多模态模型。
+- **交互向导 + 安全护栏**:敲 `testpilot` 一步步选;支付、删除、发送等不可逆操作自动拦截。
 
 ## 安装
 
