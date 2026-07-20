@@ -1,5 +1,32 @@
 # TestPilot 任务清单
 
+> 版本 v0.2 · 2026-07-16 · **已重定位为本地 CLI 测试工具**(见下方「重定位后路线图」)。
+> 平台阶段的历史里程碑(M0~M2 平台部分)保留在文末,代码在 git 历史。
+
+## 重定位后路线图(本地优先 CLI)
+
+方向:纯本地 CLI,测自己的项目,本机 Claude 订阅驱动(零 API 成本),Web + Android(iOS 后续)。
+
+### 已完成(2026-07-16)
+- [x] 砍平台:删除 server/web/admin/runner/认证/额度;保留 executor/detectors/engine/报告
+- [x] ExplorerTarget 接口泛化 + 统一 AiAgent + executor.createAgent(Web/Android 共用)
+- [x] Android 执行器(adb + @midscene/android)+ logcat 崩溃/ANR 检测;实测模拟器打通
+- [x] 用例模型 TestCase + CaseRunner(逐步 aiAction+aiBoolean 判定,护栏,HTML 报告)
+- [x] 本机 Claude CLI 视觉执行:CliBrain(探索,实测走通注册)+ CliWebAgent(用例执行)
+- [x] 需求文档 → 用例生成(gen-cases,claude 纯文本),实测演示文档出 5 条用例
+- [x] CLI 命令齐:explore / explore-app / run-cases(--engine cli|midscene)/ gen-cases
+
+### 下一步
+- [ ] Figma MCP 接入:拉设计稿 → 生成用例(gen-cases 增加 --figma 来源)
+- [ ] Android 用例执行的 CLI 版(uiautomator 取元素 + adb 点击,现 Android 用例走 midscene)
+- [ ] 回归模式:多次运行对比、失败用例聚焦重跑
+- [ ] iOS 执行器(Midscene iOS,macOS + WebDriverAgent)
+- [ ] CLI 打包发布(tsup 产物已就绪,npm publish 待定名)
+
+---
+
+# 历史(平台阶段,已废弃,代码见 git 历史)
+
 > 版本 v0.1 · 2026-07-14 · 里程碑制,每个里程碑结束有可验证的验收标准
 
 ## M0 — 核心执行器验证 ⬅ 当前(2026-07-14 主体完成)
