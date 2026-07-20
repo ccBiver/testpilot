@@ -27,7 +27,14 @@ pnpm install:cli    # 构建并把 testpilot 装为全局命令(软链到 ~/.loc
 
 ## 快速开始
 
-默认用本机 **Claude Code CLI** 驱动,零 API 成本(走你的订阅)。也可切多模态模型 key。
+最简单:直接敲 **`testpilot`**,进入交互式向导,一步步选择即可(探索 / 生成用例 / 执行用例),
+无需记命令和参数。
+
+```bash
+testpilot          # ← 交互向导,新手推荐
+```
+
+熟练后也可用子命令(适合脚本化)。默认用本机 **Claude Code CLI** 驱动,零 API 成本。
 
 ```bash
 # 需求文档 → 生成用例(纯文本,claude CLI)
