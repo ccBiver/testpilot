@@ -13,6 +13,8 @@ import { checkGuardrail, type AiAgent, type ExplorerTarget } from '@testpilot/ex
 export interface CaseRunnerOptions {
   outDir: string;
   modelConfig?: ModelConfig;
+  /** 自定义 agent 工厂(如本机 Claude CLI 版);默认用 target.createAgent(Midscene 多模态) */
+  agentFactory?: (target: ExplorerTarget) => Promise<AiAgent>;
   onProgress?: (message: string) => void;
 }
 
@@ -34,7 +36,9 @@ export class CaseRunner {
     await mkdir(shotsDir, { recursive: true });
 
     await this.target.launch(this.suite.target);
-    const agent = await this.target.createAgent(this.opts.modelConfig);
+    const agent = this.opts.agentFactory
+      ? await this.opts.agentFactory(this.target)
+      : await this.target.createAgent(this.opts.modelConfig);
 
     const results: CaseResult[] = [];
     let shotSeq = 0;

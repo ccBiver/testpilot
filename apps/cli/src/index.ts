@@ -9,6 +9,7 @@ import {
   AndroidAiBrain,
   CaseRunner,
   CliBrain,
+  CliWebAgent,
   Explorer,
   HeuristicBrain,
   renderCaseReport,
@@ -110,9 +111,10 @@ program
 
 program
   .command('run-cases')
-  .description('执行测试用例文件(.yaml/.json),Web 或 Android;需多模态模型')
+  .description('执行测试用例文件(.yaml/.json),Web 或 Android')
   .argument('<file>', '用例文件路径')
   .option('-o, --out <dir>', '输出目录,默认 runs/<时间戳>')
+  .option('-e, --engine <engine>', '决策引擎:cli(本机 Claude 订阅,零 API 成本)| midscene(多模态模型 key)', 'cli')
   .option('--headed', '显示浏览器窗口(仅 Web)', false)
   .action(async (file: string, opts) => {
     const suite = await loadSuite(path.resolve(file));
@@ -130,7 +132,17 @@ program
       target = new WebExecutor({ headless: !opts.headed });
     }
 
-    const runner = new CaseRunner(target, suite, { outDir, onProgress: (m) => console.log(m) });
+    // 默认用本机 Claude CLI(零成本);--engine midscene 走多模态模型 key。
+    // CLI 引擎目前仅 Web 支持(依赖 WebExecutor 元素树);Android 用例走 midscene。
+    const useCli = opts.engine === 'cli' && suite.platform === 'web';
+    const runner = new CaseRunner(target, suite, {
+      outDir,
+      agentFactory: useCli
+        ? async (t) => new CliWebAgent(t as WebExecutor)
+        : undefined,
+      onProgress: (m) => console.log(m),
+    });
+    console.log(`引擎:${useCli ? '本机 Claude CLI' : '多模态模型(midscene)'}`);
     console.log(`🧪 执行 ${suite.cases.length} 条用例 → ${suite.target}(${suite.platform})\n`);
     try {
       const report = await runner.run();
