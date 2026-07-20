@@ -342,19 +342,19 @@
     <div class="sec-head reveal">
       <span class="eyebrow">Pre-flight · 怎么用</span>
       <h2>登机三步</h2>
-      <p>一行命令免安装起飞。前提:本机装了 <span class="mono" style="color:var(--hud)">claude</span> CLI(零成本驱动)与 Node 20+。</p>
+      <p>装一次,之后任意目录只敲 <span class="mono" style="color:var(--hud)">testpilot</span>。前提:本机装了 <span class="mono" style="color:var(--hud)">claude</span> CLI(零成本驱动)与 Node 20+。</p>
     </div>
 
     <div class="steps">
       <div class="step reveal">
         <div class="n">STEP 01</div>
-        <h3>进你的项目</h3>
-        <p><code>cd</code> 到要测的项目目录——报告和用例会落在这里。</p>
+        <h3>全局装一次</h3>
+        <p>敲 <code>npm i -g @biver/testpilot</code>。之后命令就是 <code>testpilot</code>,任意目录可用。</p>
       </div>
       <div class="step reveal">
         <div class="n">STEP 02</div>
-        <h3>一行起飞</h3>
-        <p>敲 <code>npx @biver/testpilot</code>。首次自动下载工具与测试浏览器,免安装。</p>
+        <h3>进你的项目</h3>
+        <p><code>cd</code> 到要测的项目目录(报告和用例会落在这里),敲 <code>testpilot</code>。</p>
       </div>
       <div class="step reveal">
         <div class="n">STEP 03</div>
@@ -540,7 +540,7 @@
     const el = document.getElementById('term');
     if (!el) return;
     const lines = [
-      { t: '$ npx @biver/testpilot', c: 'c-prompt' },
+      { t: '$ testpilot', c: 'c-prompt' },
       { t: '', c: '' },
       { t: '┌  🛰  TestPilot — 本地 AI 测试工具', c: 'c-ok' },
       { t: '│', c: 'c-dim' },

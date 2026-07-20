@@ -25,12 +25,15 @@
 
 ## 安装
 
-已发布到 npm(命令仍是 `testpilot`):
+全局装一次,之后任意目录只敲 `testpilot`:
 
 ```bash
-npm i -g @biver/testpilot     # 或免安装直跑:npx @biver/testpilot
-testpilot                     # 任意目录
+npm i -g @biver/testpilot     # 装一次
+testpilot                     # 任意目录直接用
 ```
+
+> 偶尔用一次也可免安装:`npx @biver/testpilot`(命令长,但不占全局)。
+> 更新版本:`npm i -g @biver/testpilot@latest`。
 
 从源码本地开发:
 
