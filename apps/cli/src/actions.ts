@@ -207,6 +207,8 @@ export interface RunCasesOptions {
   target: string;
   /** 平台;覆盖用例文件里的值 */
   platform: 'web' | 'android';
+  /** Android adb 设备序列号(多设备时指定) */
+  deviceId?: string;
   headed?: boolean;
   out?: string;
 }
@@ -220,7 +222,7 @@ export async function runCases(opts: RunCasesOptions): Promise<void> {
 
   let target: ExplorerTarget;
   if (opts.platform === 'android') {
-    target = new AndroidExecutor();
+    target = new AndroidExecutor({ deviceId: opts.deviceId });
   } else {
     const { ensureChromium } = await import('./ensure-browser.js');
     ensureChromium();

@@ -87,6 +87,7 @@ program
   .argument('<file>', '用例文件路径')
   .requiredOption('-t, --target <target>', '被测目标:web 填 URL,android 填包名')
   .option('-p, --platform <platform>', '平台:web | android(默认按 target 猜:http→web,否则 android)')
+  .option('-d, --device <id>', 'Android adb 设备序列号(多设备时指定)')
   .option('-o, --out <dir>', '输出目录')
   .option('-e, --engine <engine>', '引擎:cli(本机 Claude)| midscene(模型 key)', 'cli')
   .option('--headed', '显示浏览器窗口(仅 Web)', false)
@@ -101,6 +102,7 @@ program
       file,
       target: opts.target,
       platform,
+      deviceId: opts.device,
       engine: opts.engine === 'midscene' ? 'midscene' : 'cli',
       headed: opts.headed,
       out: opts.out,

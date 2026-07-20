@@ -1,4 +1,17 @@
 import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
+import path from 'node:path';
+
+/** 解析 adb 绝对路径(优先 ANDROID_HOME/platform-tools,免依赖 PATH) */
+export function adbBin(): string {
+  const home =
+    process.env.ANDROID_HOME ||
+    process.env.ANDROID_SDK_ROOT ||
+    path.join(homedir(), 'Library/Android/sdk');
+  const p = path.join(home, 'platform-tools', 'adb');
+  return existsSync(p) ? p : 'adb';
+}
 
 function run(cmd: string, args: string[], timeout = 10_000): Promise<string> {
   return new Promise((resolve) => {
@@ -18,7 +31,7 @@ export interface DeviceApp {
 /** 列出 Android 设备上的第三方(用户安装)应用包名 */
 export async function listAndroidApps(deviceId?: string): Promise<DeviceApp[]> {
   const base = deviceId ? ['-s', deviceId] : [];
-  const out = await run('adb', [...base, 'shell', 'pm', 'list', 'packages', '-3']);
+  const out = await run(adbBin(), [...base, 'shell', 'pm', 'list', 'packages', '-3']);
   return out
     .split('\n')
     .map((l) => l.trim().replace(/^package:/, ''))
@@ -30,14 +43,14 @@ export async function listAndroidApps(deviceId?: string): Promise<DeviceApp[]> {
 /** 读 Android 当前前台应用包名(没有返回 null) */
 export async function foregroundAndroidApp(deviceId?: string): Promise<string | null> {
   const base = deviceId ? ['-s', deviceId] : [];
-  const out = await run('adb', [...base, 'shell', 'dumpsys', 'activity', 'activities']);
+  const out = await run(adbBin(), [...base, 'shell', 'dumpsys', 'activity', 'activities']);
   const m = out.match(/(?:topResumedActivity|mResumedActivity|ResumedActivity)[^\n]*\s([a-zA-Z][\w.]+)\//);
   return m?.[1] ?? null;
 }
 
 /** adb 已连接设备序列号 */
 export async function listAndroidDevices(): Promise<string[]> {
-  const out = await run('adb', ['devices']);
+  const out = await run(adbBin(), ['devices']);
   return out
     .split('\n')
     .slice(1)

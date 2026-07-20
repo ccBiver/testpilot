@@ -5,6 +5,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import type { ModelConfig, Signal } from '@testpilot/shared';
 import { applyModelConfig } from './model-config.js';
+import { adbBin } from './device-apps.js';
 import type { AiAgent, ExplorerTarget, TargetLocation, TargetObservation } from './target.js';
 
 /** Midscene/appium-adb 依赖 ANDROID_HOME;未设置时探测默认 SDK 路径 */
@@ -179,7 +180,7 @@ export class AndroidExecutor implements ExplorerTarget {
   private adbShell(args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
       const base = this.resolvedDeviceId ? ['-s', this.resolvedDeviceId] : [];
-      const proc = spawn('adb', [...base, 'shell', ...args], { timeout: 10_000 });
+      const proc = spawn(adbBin(), [...base, 'shell', ...args], { timeout: 10_000 });
       let out = '';
       proc.stdout.on('data', (d) => (out += d.toString()));
       proc.on('error', reject);
@@ -190,8 +191,8 @@ export class AndroidExecutor implements ExplorerTarget {
   /** 持续读 logcat,解析崩溃(FATAL EXCEPTION)与 ANR */
   private startLogcat(deviceId: string): void {
     // 清空历史日志,只关心本次运行期间的新日志
-    spawn('adb', ['-s', deviceId, 'logcat', '-c']);
-    const proc = spawn('adb', ['-s', deviceId, 'logcat', '-v', 'brief', '*:E']);
+    spawn(adbBin(), ['-s', deviceId, 'logcat', '-c']);
+    const proc = spawn(adbBin(), ['-s', deviceId, 'logcat', '-v', 'brief', '*:E']);
     this.logcat = proc;
     let buffer = '';
     proc.stdout.on('data', (chunk: Buffer) => {

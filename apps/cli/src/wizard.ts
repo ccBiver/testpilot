@@ -2,6 +2,7 @@ import * as p from '@clack/prompts';
 import {
   foregroundAndroidApp,
   listAndroidApps,
+  listAndroidDevices,
   listBootedIosApps,
   type DeviceApp,
 } from '@testpilot/executor';
@@ -74,14 +75,14 @@ async function wizardExplore(): Promise<void> {
   }
 
   if (platform === 'android') {
-    const pkg = await pickAndroidApp();
-    if (pkg === null) return;
+    const app = await pickAndroidApp();
+    if (app === null) return;
     const goal = await p.text({ message: '探索目标(可选)', placeholder: '重点测试注册流程,回车跳过' });
     if (cancelled(goal)) return;
     const depth = await pickDepth();
     if (depth === null) return;
-    if (!(await confirmRun(`Android 探索 ${pkg}`))) return;
-    await runExploreApp({ pkg, goal: goal ? String(goal) : undefined, steps: depth });
+    if (!(await confirmRun(`Android 探索 ${app.id}`))) return;
+    await runExploreApp({ pkg: app.id, device: app.deviceId, goal: goal ? String(goal) : undefined, steps: depth });
     return;
   }
 
@@ -175,7 +176,11 @@ async function wizardRun(): Promise<void> {
 }
 
 /** 执行时选「在哪跑」:平台 + 目标 */
-async function pickTargetAndPlatform(): Promise<{ target: string; platform: 'web' | 'android' } | null> {
+async function pickTargetAndPlatform(): Promise<{
+  target: string;
+  platform: 'web' | 'android';
+  deviceId?: string;
+} | null> {
   const platform = await p.select({
     message: '在哪跑这些用例?',
     options: [
@@ -185,21 +190,40 @@ async function pickTargetAndPlatform(): Promise<{ target: string; platform: 'web
   });
   if (cancelled(platform)) return null;
   if (platform === 'android') {
-    const pkg = await pickAndroidApp();
-    return pkg === null ? null : { target: pkg, platform: 'android' };
+    const app = await pickAndroidApp();
+    return app === null ? null : { target: app.id, platform: 'android', deviceId: app.deviceId };
   }
   const url = await p.text({ message: '网站地址', placeholder: 'https://example.com', validate: reqUrl });
   if (cancelled(url)) return null;
   return { target: String(url), platform: 'web' };
 }
 
-/** 从连接的 Android 设备选 App(当前前台 / 已装列表 / 手动),返回包名 */
-async function pickAndroidApp(): Promise<string | null> {
+/** 多台 adb 设备时先选一台;0 台提示,1 台直接用 */
+async function resolveAndroidDevice(): Promise<string | undefined | null> {
+  const devices = await listAndroidDevices();
+  if (devices.length === 0) {
+    p.log.warn('未检测到 Android 设备,请先启动模拟器或用 adb 连接真机(仍可手动输入包名)');
+    return undefined;
+  }
+  if (devices.length === 1) return devices[0];
+  const pick = await p.select({
+    message: '检测到多台设备,用哪台?',
+    options: devices.map((d) => ({ value: d, label: d })),
+  });
+  if (cancelled(pick)) return null;
+  return String(pick);
+}
+
+/** 从连接的 Android 设备选 App(当前前台 / 已装列表 / 手动),返回包名 + 设备 */
+async function pickAndroidApp(): Promise<{ id: string; deviceId?: string } | null> {
+  const deviceId = await resolveAndroidDevice();
+  if (deviceId === null) return null; // 用户取消选设备
   const s = p.spinner();
   s.start('读取设备上的应用…');
-  const [fg, apps] = await Promise.all([foregroundAndroidApp(), listAndroidApps()]);
+  const [fg, apps] = await Promise.all([foregroundAndroidApp(deviceId), listAndroidApps(deviceId)]);
   s.stop(apps.length ? `设备上有 ${apps.length} 个应用` : '未读到应用(可手动输入)');
-  return chooseApp(fg ? { id: fg, name: '当前打开的应用' } : null, apps, '应用包名', 'com.example.app');
+  const id = await chooseApp(fg ? { id: fg, name: '当前打开的应用' } : null, apps, '应用包名', 'com.example.app');
+  return id === null ? null : { id, deviceId };
 }
 
 /** 从已启动 iOS 模拟器选 App(用户应用列表 / 手动),返回 bundle id */
