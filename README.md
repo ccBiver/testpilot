@@ -1,5 +1,9 @@
 # TestPilot
 
+[![npm](https://img.shields.io/npm/v/@biver/testpilot?color=5eead4&label=%40biver%2Ftestpilot)](https://www.npmjs.com/package/@biver/testpilot)
+[![node](https://img.shields.io/node/v/@biver/testpilot?color=5eead4)](https://www.npmjs.com/package/@biver/testpilot)
+[![license](https://img.shields.io/npm/l/@biver/testpilot?color=5eead4)](./LICENSE)
+
 本地优先的 AI 测试工具。在你自己的电脑上,让 AI 像真实用户一样测试你的 **Web / Android / iOS 应用**:
 既能自主探索发现缺陷,也能执行你写的、或由需求文档与 Figma 生成的测试用例,
 产出带截图和复现步骤的 HTML / Markdown 报告。Web 与 Android 用本机 Claude 订阅驱动,零 API 成本。
@@ -20,11 +24,11 @@
 
 ## 安装
 
-发布后(npm,scoped 包,命令仍是 `testpilot`):
+已发布到 npm(命令仍是 `testpilot`):
 
 ```bash
 npm i -g @biver/testpilot     # 或免安装直跑:npx @biver/testpilot
-testpilot                        # 任意目录
+testpilot                     # 任意目录
 ```
 
 从源码本地开发:
