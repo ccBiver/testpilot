@@ -20,6 +20,15 @@
 
 ## 安装
 
+发布后(npm,scoped 包,命令仍是 `testpilot`):
+
+```bash
+npm i -g @ccbiver/testpilot     # 或免安装直跑:npx @ccbiver/testpilot
+testpilot                        # 任意目录
+```
+
+从源码本地开发:
+
 ```bash
 pnpm install
 pnpm install:cli    # 构建并把 testpilot 装为全局命令(软链到 ~/.local/bin)

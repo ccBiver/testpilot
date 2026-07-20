@@ -1,7 +1,7 @@
 {
-  "name": "testpilot-cli",
-  "version": "0.1.0",
-  "description": "TestPilot CLI:AI 自主探索测试 + 自托管 Runner。npx testpilot-cli runner --token tpr_xxx 即可为平台接单。",
+  "name": "@ccbiver/testpilot",
+  "version": "0.2.0",
+  "description": "TestPilot — 本地 AI 测试工具:AI 像真实用户一样试飞 Web/Android/iOS,自主探索找 Bug,从需求文档与 Figma 生成用例并执行,本机 Claude 驱动零 API 成本。",
   "type": "module",
   "license": "MIT",
   "bin": {
@@ -10,25 +10,33 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "explore": "tsx src/index.ts explore",
     "build": "tsup",
+    "prepublishOnly": "tsup",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@clack/prompts": "^1.7.0",
     "@midscene/android": "^1.10.4",
+    "@midscene/ios": "^1.10.5",
     "@midscene/web": "^0.30.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@playwright/test": "^1.61.1",
-    "@testpilot/detectors": "workspace:*",
     "commander": "^13.1.0",
     "playwright": "^1.53.0",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@testpilot/detectors": "workspace:*",
     "@testpilot/engine": "workspace:*",
     "@testpilot/executor": "workspace:*",
     "@testpilot/shared": "workspace:*",

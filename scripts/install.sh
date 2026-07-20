@@ -18,7 +18,7 @@ if [ -z "$BIN_DIR" ]; then
 fi
 
 echo "▶ 构建 CLI…"
-( cd "$ROOT" && pnpm --filter testpilot-cli build >/dev/null )
+( cd "$ROOT" && pnpm --filter @ccbiver/testpilot build >/dev/null )
 
 chmod +x "$BIN_SRC"
 mkdir -p "$BIN_DIR"
