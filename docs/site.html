@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="TestPilot — 本地 AI 测试工具:AI 像真实用户一样试飞你的 Web / Android / iOS 应用,自主探索找 Bug、从需求文档与 Figma 生成用例并执行,用本机 Claude 订阅驱动,零 API 成本。" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%235eead4%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><path d=%22M13 7 9 3 5 7l4 4%22/><path d=%22m17 11 4 4-4 4-4-4%22/><path d=%22m8 12 4 4 6-6-4-4Z%22/><path d=%22m16 8 3-3%22/><path d=%22M9 21a6 6 0 0 0-6-6%22/></svg>" />
+<title>TestPilot · 本地 AI 测试试飞员</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --ground: #081014;
+    --panel: #0d1b21;
+    --panel-2: #112730;
+    --edge: rgba(79, 209, 197, 0.16);
+    --edge-strong: rgba(79, 209, 197, 0.34);
+    --hud: #5eead4;        /* 磷光青 HUD 线条 */
+    --hud-dim: #2f7d74;
+    --signal: #ffb020;     /* 信号琥珀:强调/CTA */
+    --bug: #ff5d5d;        /* 语义:发现缺陷 */
+    --ink: #d5e4e6;        /* 青偏中性正文 */
+    --muted: #7c9498;
+    --faint: #4c6469;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.6;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* 全局仪表网格底纹 */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--edge) 1px, transparent 1px),
+      linear-gradient(90deg, var(--edge) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, #000 30%, transparent 78%);
+    opacity: 0.5;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .wrap { position: relative; z-index: 1; max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+  a { color: inherit; text-decoration: none; }
+  ::selection { background: var(--signal); color: #1a1204; }
+  :focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; border-radius: 4px; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--hud);
+  }
+  .mono { font-family: var(--mono); }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* ── 顶栏 ── */
+  header.nav {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px;
+    max-width: 1120px; margin: 0 auto;
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--edge);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-weight: 700; letter-spacing: 0.12em; }
+  .brand .sat { width: 26px; height: 26px; color: var(--hud); }
+  .brand b { color: var(--signal); }
+  .nav-right { display: flex; align-items: center; gap: 18px; font-family: var(--mono); font-size: 13px; }
+  .nav-right a { color: var(--muted); transition: color .2s; }
+  .nav-right a:hover { color: var(--hud); }
+  .chip {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
+    padding: 4px 10px; border: 1px solid var(--edge-strong); border-radius: 999px;
+    color: var(--hud);
+  }
+
+  /* ── Hero ── */
+  .hero { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 48px; align-items: center; padding: 72px 0 64px; }
+  @media (max-width: 860px) { .hero { grid-template-columns: 1fr; gap: 36px; padding: 48px 0; } }
+
+  .hero h1 {
+    font-family: var(--mono);
+    font-size: clamp(34px, 5.4vw, 58px);
+    line-height: 1.04;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 18px 0 0;
+  }
+  .hero h1 .amber { color: var(--signal); }
+  .hero h1 .out {
+    color: transparent;
+    -webkit-text-stroke: 1.4px var(--hud);
+  }
+  .lede { margin-top: 20px; font-size: 18px; color: var(--muted); max-width: 34em; }
+  .lede b { color: var(--ink); font-weight: 600; }
+
+  .cta-row { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 30px; }
+  .cmd {
+    font-family: var(--mono); font-size: 14px;
+    display: inline-flex; align-items: center; gap: 12px;
+    background: var(--panel); border: 1px solid var(--edge-strong);
+    padding: 13px 16px; border-radius: 10px; color: var(--ink);
+    cursor: pointer; transition: border-color .2s, transform .12s;
+  }
+  .cmd:hover { border-color: var(--hud); }
+  .cmd:active { transform: translateY(1px); }
+  .cmd .prompt { color: var(--hud); }
+  .cmd .copy { color: var(--faint); font-size: 11px; letter-spacing: 0.1em; }
+  .btn-ghost {
+    font-family: var(--mono); font-size: 14px;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 13px 18px; border-radius: 10px;
+    border: 1px solid var(--edge); color: var(--muted); transition: color .2s, border-color .2s;
+  }
+  .btn-ghost:hover { color: var(--signal); border-color: var(--signal); }
+
+  .telemetry { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 30px; font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+  .telemetry span { display: inline-flex; align-items: center; gap: 7px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--hud); box-shadow: 0 0 8px var(--hud); }
+  .dot.amber { background: var(--signal); box-shadow: 0 0 8px var(--signal); }
+
+  /* ── 雷达仪表 ── */
+  .instrument {
+    position: relative;
+    aspect-ratio: 1;
+    border: 1px solid var(--edge-strong);
+    border-radius: 16px;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(94,234,212,0.05), transparent 70%),
+      var(--panel);
+    overflow: hidden;
+    box-shadow: inset 0 0 60px rgba(0,0,0,0.5);
+  }
+  .instrument canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .inst-readout {
+    position: absolute; left: 14px; bottom: 12px; right: 14px;
+    display: flex; justify-content: space-between;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; color: var(--hud-dim);
+  }
+  .inst-readout .live { color: var(--bug); }
+  .inst-tag {
+    position: absolute; top: 14px; left: 14px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* ── 通用区块 ── */
+  section { padding: 60px 0; position: relative; }
+  .sec-head { margin-bottom: 36px; }
+  .sec-head h2 {
+    font-family: var(--mono); font-weight: 700;
+    font-size: clamp(24px, 3.2vw, 34px); letter-spacing: -0.01em; margin-top: 10px;
+    text-wrap: balance;
+  }
+  .sec-head p { color: var(--muted); margin-top: 10px; max-width: 40em; }
+
+  /* 能力卡片 */
+  .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  @media (max-width: 720px) { .cards { grid-template-columns: 1fr; } }
+  .card {
+    border: 1px solid var(--edge); border-radius: 14px; padding: 24px;
+    background: linear-gradient(160deg, var(--panel-2), var(--panel));
+    transition: border-color .25s, transform .25s;
+  }
+  .card:hover { border-color: var(--edge-strong); transform: translateY(-3px); }
+  .card .ico { width: 30px; height: 30px; color: var(--hud); margin-bottom: 14px; }
+  .card h3 { font-family: var(--mono); font-size: 16px; letter-spacing: 0.02em; }
+  .card p { color: var(--muted); font-size: 14.5px; margin-top: 8px; }
+  .card .tagline { color: var(--signal); font-family: var(--mono); font-size: 12px; margin-top: 12px; letter-spacing: 0.04em; }
+
+  /* 三步 */
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 30px; }
+  @media (max-width: 720px) { .steps { grid-template-columns: 1fr; } }
+  .step { border: 1px solid var(--edge); border-radius: 14px; padding: 22px; background: var(--panel); }
+  .step .n { font-family: var(--mono); font-size: 12px; letter-spacing: 0.2em; color: var(--signal); }
+  .step h3 { font-family: var(--mono); font-size: 17px; margin-top: 10px; }
+  .step p { color: var(--muted); font-size: 14px; margin-top: 8px; }
+  .step code { font-family: var(--mono); font-size: 12.5px; color: var(--hud); background: rgba(94,234,212,0.08); padding: 1px 6px; border-radius: 5px; }
+
+  /* 终端窗口 */
+  .term {
+    border: 1px solid var(--edge-strong); border-radius: 12px; overflow: hidden;
+    background: #060d10; box-shadow: 0 24px 60px -30px rgba(0,0,0,0.9);
+  }
+  .term-bar { display: flex; align-items: center; gap: 8px; padding: 11px 15px; border-bottom: 1px solid var(--edge); background: var(--panel); }
+  .term-bar i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .term-bar .r { background: #ff5f57; } .term-bar .y { background: #febc2e; } .term-bar .g { background: #28c840; }
+  .term-bar .title { font-family: var(--mono); font-size: 12px; color: var(--faint); margin-left: 8px; letter-spacing: 0.05em; }
+  .term-body { font-family: var(--mono); font-size: 13.5px; line-height: 1.85; padding: 20px; min-height: 340px; white-space: pre-wrap; }
+  .term-body .c-prompt { color: var(--hud); }
+  .term-body .c-dim { color: var(--faint); }
+  .term-body .c-sel { color: var(--signal); }
+  .term-body .c-bug { color: var(--bug); }
+  .term-body .c-ok { color: var(--hud); }
+  .caret { display: inline-block; width: 8px; height: 16px; background: var(--signal); vertical-align: -3px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* 状态板 */
+  .board { border: 1px solid var(--edge); border-radius: 14px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  thead th {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted); text-align: left; padding: 14px 18px; background: var(--panel-2);
+    border-bottom: 1px solid var(--edge);
+  }
+  tbody td { padding: 15px 18px; border-bottom: 1px solid var(--edge); color: var(--ink); }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover { background: rgba(94,234,212,0.03); }
+  td .plat { font-family: var(--mono); font-weight: 700; letter-spacing: 0.04em; }
+  .pill { font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; padding: 3px 9px; border-radius: 999px; display: inline-block; }
+  .pill.on { color: var(--hud); border: 1px solid var(--edge-strong); background: rgba(94,234,212,0.07); }
+  .pill.cond { color: var(--signal); border: 1px solid rgba(255,176,32,0.4); background: rgba(255,176,32,0.07); }
+  .pill.off { color: var(--muted); border: 1px solid var(--edge); }
+
+  /* 命令参考 */
+  .reflist { display: grid; gap: 10px; }
+  .ref {
+    display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 16px; align-items: center;
+    border: 1px solid var(--edge); border-radius: 10px; padding: 15px 18px; background: var(--panel);
+  }
+  .ref code { font-family: var(--mono); font-size: 13.5px; color: var(--ink); }
+  .ref code .amber { color: var(--signal); }
+  .ref .what { color: var(--muted); font-size: 13px; font-family: var(--mono); text-align: right; }
+  @media (max-width: 640px) { .ref { grid-template-columns: 1fr; } .ref .what { text-align: left; } }
+
+  .note { margin-top: 20px; font-size: 13.5px; color: var(--muted); border-left: 2px solid var(--signal); padding: 4px 0 4px 16px; }
+  .note b { color: var(--ink); }
+
+  footer { border-top: 1px solid var(--edge); padding: 34px 0 48px; margin-top: 40px; }
+  footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px; font-family: var(--mono); font-size: 12.5px; color: var(--faint); }
+
+  /* 滚动显现 */
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s ease, transform .6s ease; }
+  .reveal.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+    .caret { animation: none; }
+    html { scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <span class="brand">
+    <svg class="sat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7 9 3 5 7l4 4"/><path d="m17 11 4 4-4 4-4-4"/><path d="m8 12 4 4 6-6-4-4Z"/><path d="m16 8 3-3"/><path d="M9 21a6 6 0 0 0-6-6"/></svg>
+    TEST<b>PILOT</b>
+  </span>
+  <nav class="nav-right">
+    <a href="#capabilities">能力</a>
+    <a href="#usage">怎么用</a>
+    <a href="#platforms">平台</a>
+    <span class="chip">v0.2 · 本地零成本</span>
+  </nav>
+</header>
+
+<main class="wrap">
+  <!-- HERO -->
+  <section class="hero" style="padding-top:56px">
+    <div>
+      <span class="eyebrow">本地 AI 测试试飞员</span>
+      <h1>让 AI 像真实用户<br>一样 <span class="amber">试飞</span> 你的<br><span class="out">Web·安卓·iOS</span></h1>
+      <p class="lede">
+        一个跑在你自己电脑上的命令行工具。AI 自主点击、填表、走流程,自动找出崩溃、报错与流程断点;
+        也能把 <b>需求文档 / Figma</b> 变成测试用例逐条执行。<b>用本机 Claude 订阅驱动,零 API 成本。</b>
+      </p>
+      <div class="cta-row">
+        <button class="cmd" data-copy="testpilot" aria-label="复制命令 testpilot">
+          <span class="prompt">$</span> testpilot
+          <span class="copy">点击复制</span>
+        </button>
+        <a class="btn-ghost" href="#usage">↓ 看怎么用</a>
+      </div>
+      <div class="telemetry">
+        <span><i class="dot"></i>Web · Android 就绪</span>
+        <span><i class="dot amber"></i>iOS(macOS)</span>
+        <span><i class="dot"></i>Claude CLI 驱动</span>
+        <span><i class="dot"></i>需求文档 · Figma → 用例</span>
+      </div>
+    </div>
+
+    <div class="instrument" aria-hidden="true">
+      <span class="inst-tag">EXPLORE · SCAN</span>
+      <canvas id="radar"></canvas>
+      <div class="inst-readout">
+        <span>SWEEP <span id="deg" class="tnum">000</span>°</span>
+        <span class="live" id="bugcount">◍ 0 BUGS</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 能力 -->
+  <section id="capabilities">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Flight Systems · 能力</span>
+      <h2>四套系统,一个命令</h2>
+      <p>探索、生成、执行、多端——都收在同一个 <span class="mono" style="color:var(--hud)">testpilot</span> 里。</p>
+    </div>
+    <div class="cards">
+      <div class="card reveal">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/></svg>
+        <h3>AI 自主探索</h3>
+        <p>给一个网址或 App,AI 像真人一样把界面点一遍,自动抓崩溃、控制台报错、接口 500、死链、ANR,每个缺陷带截图和复现步骤。</p>
+        <div class="tagline">// 无需写一行用例</div>
+      </div>
+      <div class="card reveal">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>
+        <h3>文档 · Figma → 用例</h3>
+        <p>把需求文档或 Figma 设计稿丢进去,AI 生成结构化测试用例(步骤 + 预期),存成 YAML,可直接执行。Figma 走官方 MCP 授权,无需贴 token。</p>
+        <div class="tagline">// 从规格直达可执行用例</div>
+      </div>
+      <div class="card reveal">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <h3>用例执行</h3>
+        <p>逐条跑用例:每步执行动作、判定预期,给出通过 / 失败 / 阻塞。危险操作(支付、删除、发送)自动被护栏拦截。</p>
+        <div class="tagline">// 通过率一目了然</div>
+      </div>
+      <div class="card reveal">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/><rect width="6" height="10" x="15" y="8" rx="1"/></svg>
+        <h3>Web · Android · iOS</h3>
+        <p>三端统一的探索循环与报告。Web 与 Android 用本机 Claude 零成本驱动;iOS 走 Midscene 视觉引擎(macOS)。</p>
+        <div class="tagline">// 一套心智,测遍三端</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 怎么用 -->
+  <section id="usage">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Pre-flight · 怎么用</span>
+      <h2>登机三步</h2>
+      <p>装一次,之后任意目录敲 <span class="mono" style="color:var(--hud)">testpilot</span>,跟着向导选就行——不用记参数。</p>
+    </div>
+
+    <div class="steps">
+      <div class="step reveal">
+        <div class="n">STEP 01</div>
+        <h3>装一次</h3>
+        <p>在仓库里跑 <code>pnpm install</code> 和 <code>pnpm install:cli</code>,把 testpilot 装成全局命令。</p>
+      </div>
+      <div class="step reveal">
+        <div class="n">STEP 02</div>
+        <h3>进你的项目</h3>
+        <p><code>cd</code> 到你要测的项目目录(报告和用例会落在这里),敲 <code>testpilot</code>。</p>
+      </div>
+      <div class="step reveal">
+        <div class="n">STEP 03</div>
+        <h3>跟着向导选</h3>
+        <p>做什么 → 平台 → 目标 → 深度。回车,AI 开测,完事出 HTML 报告。</p>
+      </div>
+    </div>
+
+    <div class="term reveal">
+      <div class="term-bar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="title">testpilot — 交互向导</span></div>
+      <div class="term-body" id="term"></div>
+    </div>
+  </section>
+
+  <!-- 平台 -->
+  <section id="platforms">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Status Board · 平台支持</span>
+      <h2>三端真实状态</h2>
+      <p>不夸大:每一端要准备什么、能不能零成本,列清楚。</p>
+    </div>
+    <div class="board reveal">
+      <table>
+        <thead>
+          <tr><th>平台</th><th>探索 / 用例</th><th>零成本(本机 Claude)</th><th>前置准备</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="plat" style="color:var(--hud)">Web</span></td>
+            <td><span class="pill on">全功能</span></td>
+            <td><span class="pill on">✓ 是</span></td>
+            <td class="mono" style="color:var(--muted);font-size:13px">无(浏览器自动装)</td>
+          </tr>
+          <tr>
+            <td><span class="plat" style="color:var(--hud)">Android</span></td>
+            <td><span class="pill on">全功能</span></td>
+            <td><span class="pill on">✓ 是</span></td>
+            <td class="mono" style="color:var(--muted);font-size:13px">开模拟器 / 连真机 + adb</td>
+          </tr>
+          <tr>
+            <td><span class="plat" style="color:var(--signal)">iOS</span></td>
+            <td><span class="pill cond">探索 / 用例</span></td>
+            <td><span class="pill off">需模型 key</span></td>
+            <td class="mono" style="color:var(--muted);font-size:13px">macOS + Xcode + WDA@:8100</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">
+      <b>零成本怎么来的:</b> Web / Android 用你本机的 Claude Code 订阅做决策(看截图选元素),不走付费 API。
+      iOS 因未暴露公开坐标点击,走视觉模型(如 DashScope Qwen-VL),需要一个模型 key。
+    </p>
+  </section>
+
+  <!-- 命令参考 -->
+  <section id="commands">
+    <div class="sec-head reveal">
+      <span class="eyebrow">Manual Control · 命令参考</span>
+      <h2>老手直接敲(可脚本化 / CI)</h2>
+    </div>
+    <div class="reflist">
+      <div class="ref reveal"><code>testpilot</code><span class="what">交互向导 · 新手推荐</span></div>
+      <div class="ref reveal"><code>testpilot explore <span class="amber">&lt;url&gt;</span></code><span class="what">AI 探索 Web 站点</span></div>
+      <div class="ref reveal"><code>testpilot explore-app <span class="amber">&lt;包名&gt;</span></code><span class="what">探索 Android 应用</span></div>
+      <div class="ref reveal"><code>testpilot explore-ios <span class="amber">&lt;bundleId&gt;</span></code><span class="what">探索 iOS 应用 · macOS</span></div>
+      <div class="ref reveal"><code>testpilot gen-cases <span class="amber">prd.md</span> -t &lt;url&gt;</code><span class="what">需求文档 → 用例</span></div>
+      <div class="ref reveal"><code>testpilot gen-cases <span class="amber">--figma</span> &lt;链接&gt; -t &lt;url&gt;</code><span class="what">Figma → 用例</span></div>
+      <div class="ref reveal"><code>testpilot run-cases <span class="amber">cases.yaml</span></code><span class="what">执行用例文件</span></div>
+    </div>
+    <p class="note"><b>提示:</b> 向导里生成完用例会直接问「马上执行?」,gen → run 一步串起,平时根本不用记这些。</p>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>🛰 TESTPILOT · 本地 AI 测试工具</span>
+    <span>Web · Android · iOS &nbsp;/&nbsp; 零 API 成本 &nbsp;/&nbsp; © 2026</span>
+  </div>
+</footer>
+
+<script>
+  // ── 点击复制命令 ──
+  document.querySelectorAll('.cmd[data-copy]').forEach((el) => {
+    el.addEventListener('click', () => {
+      navigator.clipboard?.writeText(el.dataset.copy).then(() => {
+        const tag = el.querySelector('.copy');
+        if (!tag) return;
+        const old = tag.textContent;
+        tag.textContent = '已复制 ✓';
+        tag.style.color = 'var(--hud)';
+        setTimeout(() => { tag.textContent = old; tag.style.color = ''; }, 1400);
+      });
+    });
+  });
+
+  // ── 滚动显现 ──
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach((el, i) => {
+    el.style.transitionDelay = (i % 4 * 60) + 'ms';
+    io.observe(el);
+  });
+
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ── 雷达扫描仪表 ──
+  (function radar() {
+    const cv = document.getElementById('radar');
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    const degEl = document.getElementById('deg');
+    const bugEl = document.getElementById('bugcount');
+    let W, H, R, cx, cy;
+    function size() {
+      const d = Math.min(cv.clientWidth, cv.clientHeight) || 380;
+      const dpr = Math.min(devicePixelRatio || 1, 2);
+      cv.width = d * dpr; cv.height = d * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      W = d; H = d; cx = d / 2; cy = d / 2; R = d * 0.44;
+    }
+    size(); addEventListener('resize', size);
+
+    // 随机分布的目标(“缺陷”),被扫到才点亮
+    const blips = Array.from({ length: 6 }, () => ({
+      a: Math.random() * Math.PI * 2, r: (0.28 + Math.random() * 0.62) * 1, lit: 0,
+    }));
+    let ang = -Math.PI / 2, found = 0, lastReport = 0;
+
+    function draw(t) {
+      ctx.clearRect(0, 0, W, H);
+      // 同心圈
+      ctx.strokeStyle = 'rgba(94,234,212,0.16)'; ctx.lineWidth = 1;
+      for (let i = 1; i <= 3; i++) { ctx.beginPath(); ctx.arc(cx, cy, R * i / 3, 0, Math.PI * 2); ctx.stroke(); }
+      // 十字准线
+      ctx.beginPath(); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy);
+      ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
+
+      // 扫描扇形
+      const grad = ctx.createConicGradient ? null : null;
+      ctx.save();
+      ctx.translate(cx, cy); ctx.rotate(ang);
+      const g = ctx.createLinearGradient(0, 0, R, 0);
+      g.addColorStop(0, 'rgba(94,234,212,0.32)'); g.addColorStop(1, 'rgba(94,234,212,0)');
+      ctx.beginPath(); ctx.moveTo(0, 0);
+      ctx.arc(0, 0, R, -0.42, 0); ctx.closePath();
+      ctx.fillStyle = g; ctx.fill();
+      // 扫描前沿亮线
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(R, 0);
+      ctx.strokeStyle = 'rgba(94,234,212,0.9)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.restore();
+
+      // blips
+      blips.forEach((b) => {
+        const bx = cx + Math.cos(b.a) * R * b.r, by = cy + Math.sin(b.a) * R * b.r;
+        let diff = (ang - b.a) % (Math.PI * 2); if (diff < 0) diff += Math.PI * 2;
+        if (diff < 0.12 && b.lit < 1) { if (b.lit === 0) found++; b.lit = 1; }
+        b.lit *= 0.985;
+        if (b.lit > 0.02) {
+          ctx.beginPath(); ctx.arc(bx, by, 3.2, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255,93,93,${0.35 + b.lit * 0.65})`; ctx.fill();
+          ctx.beginPath(); ctx.arc(bx, by, 3.2 + (1 - b.lit) * 10, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(255,93,93,${b.lit * 0.5})`; ctx.lineWidth = 1; ctx.stroke();
+        }
+      });
+      // 中心点
+      ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, Math.PI * 2); ctx.fillStyle = 'var(--signal)';
+      ctx.fillStyle = '#ffb020'; ctx.fill();
+
+      if (!reduce) ang += 0.02;
+      if (t - lastReport > 90) {
+        lastReport = t;
+        let d = Math.round(((ang + Math.PI / 2) * 180 / Math.PI) % 360); if (d < 0) d += 360;
+        if (degEl) degEl.textContent = String(d).padStart(3, '0');
+        if (bugEl) bugEl.textContent = '◍ ' + found + ' BUGS';
+      }
+      requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  })();
+
+  // ── 终端打字机:向导流程 ──
+  (function terminal() {
+    const el = document.getElementById('term');
+    if (!el) return;
+    const lines = [
+      { t: '$ testpilot', c: 'c-prompt' },
+      { t: '', c: '' },
+      { t: '┌  🛰  TestPilot — 本地 AI 测试工具', c: 'c-ok' },
+      { t: '│', c: 'c-dim' },
+      { t: '◆  你想做什么?', c: '' },
+      { t: '│  ● AI 自主探索      自动找 Bug', c: 'c-sel' },
+      { t: '│  ○ 生成测试用例     文档 / Figma', c: 'c-dim' },
+      { t: '│  ○ 执行测试用例', c: 'c-dim' },
+      { t: '│', c: 'c-dim' },
+      { t: '◆  测什么平台?   › Web 网站', c: '' },
+      { t: '◇  网址   › http://localhost:3000', c: '' },
+      { t: '◆  引擎   › 本机 Claude(零成本)', c: 'c-sel' },
+      { t: '◆  深度   › 标准(约 5~10 分钟)', c: '' },
+      { t: '│', c: 'c-dim' },
+      { t: '▸ 步骤 1  打开首页', c: 'c-dim' },
+      { t: '▸ 步骤 2  点击「注册」,填写表单', c: 'c-dim' },
+      { t: '⚠ 发现缺陷 [high] 控制台报错:cart is undefined', c: 'c-bug' },
+      { t: '▸ 步骤 3  提交注册流程', c: 'c-dim' },
+      { t: '│', c: 'c-dim' },
+      { t: '✔ 完成 · 覆盖 6 页 · 发现 3 个缺陷', c: 'c-ok' },
+      { t: '📄 报告 › runs/2026-.../report.html', c: 'c-ok' },
+    ];
+    let li = 0, ci = 0;
+    const caret = '<span class="caret"></span>';
+    function tick() {
+      if (li >= lines.length) { el.innerHTML = render(li) ; return; }
+      ci++;
+      if (ci > lines[li].t.length) { li++; ci = 0; setTimeout(tick, 260); return; }
+      el.innerHTML = render(li, ci);
+      const ch = lines[li - 0] ? lines[li].t[ci - 1] : '';
+      setTimeout(tick, reduce ? 0 : (ci === 1 ? 90 : 14 + Math.random() * 22));
+    }
+    function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function render(upto, partial) {
+      const out = [];
+      for (let i = 0; i < upto; i++) out.push(`<span class="${lines[i].c}">${esc(lines[i].t)}</span>`);
+      if (partial !== undefined && upto < lines.length) {
+        out.push(`<span class="${lines[upto].c}">${esc(lines[upto].t.slice(0, partial))}</span>${caret}`);
+      }
+      return out.join('\n');
+    }
+    if (reduce) { el.innerHTML = lines.map(l => `<span class="${l.c}">${esc(l.t)}</span>`).join('\n'); }
+    else { setTimeout(tick, 500); }
+  })();
+</script>
+
+</body>
+</html>
