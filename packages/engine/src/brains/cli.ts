@@ -12,21 +12,29 @@ export interface CliDecision {
   description: string;
 }
 
-const STEP_TIMEOUT_MS = 90_000;
+const STEP_TIMEOUT_MS = 180_000; // 看图+推理比纯文本慢,给足时间避免误判超时
+const CLI_MAX_RETRIES = 2; // claude 偶发非零退出(冷启动/瞬时故障)时重试,避免一次抖动就判失败
 
-/** 默认决策器:调本机 claude CLI 无头模式,允许 Read 工具查看截图 */
-export const claudeInvoker: CliInvoker = (prompt) =>
-  new Promise((resolve, reject) => {
+/** 单次调用本机 claude CLI 无头模式,允许 Read 工具查看截图 */
+function invokeOnce(prompt: string): Promise<string> {
+  return new Promise((resolve, reject) => {
     const child = execFile(
       'claude',
       ['-p', prompt, '--allowedTools', 'Read'],
       { timeout: STEP_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024 },
       (err, stdout, stderr) => {
         if (err) {
-          const hint = /ENOENT/.test(String(err))
-            ? '未找到 claude 命令,请确认本机已安装 Claude Code CLI'
-            : (stderr || err.message).slice(0, 300);
-          reject(new Error(`claude CLI 调用失败:${hint}`));
+          if (/ENOENT/.test(String(err))) {
+            reject(new Error('未找到 claude 命令,请确认本机已安装 Claude Code CLI'));
+            return;
+          }
+          const timedOut = (err as { killed?: boolean }).killed;
+          const code = (err as { code?: number | string }).code;
+          const detail = (stderr || stdout || '').trim().slice(0, 300);
+          const reason = timedOut
+            ? `超时(>${STEP_TIMEOUT_MS / 1000}s)`
+            : `退出码 ${code}${detail ? `:${detail}` : ''}`;
+          reject(new Error(reason));
           return;
         }
         resolve(stdout);
@@ -36,6 +44,23 @@ export const claudeInvoker: CliInvoker = (prompt) =>
     // 否则 claude 无头模式会等待 stdin,3 秒后告警「no stdin data received」甚至失败。
     child.stdin?.end();
   });
+}
+
+/** 默认决策器:调本机 claude,瞬时失败自动重试,连续失败才抛错 */
+export const claudeInvoker: CliInvoker = async (prompt) => {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= CLI_MAX_RETRIES; attempt++) {
+    try {
+      return await invokeOnce(prompt);
+    } catch (err) {
+      lastErr = err;
+      // ENOENT(没装 claude)不必重试
+      if (err instanceof Error && err.message.includes('未找到 claude 命令')) break;
+    }
+  }
+  const msg = lastErr instanceof Error ? lastErr.message : String(lastErr);
+  throw new Error(`claude CLI 调用失败(已重试 ${CLI_MAX_RETRIES} 次):${msg}`);
+};
 
 /**
  * CLI 大脑:用本机 Claude Code(claude -p)做决策——零 API 成本,用订阅额度。
