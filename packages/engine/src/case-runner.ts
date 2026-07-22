@@ -15,8 +15,19 @@ export interface CaseRunnerOptions {
   modelConfig?: ModelConfig;
   /** 自定义 agent 工厂(如本机 Claude CLI 版);默认用 target.createAgent(Midscene 多模态) */
   agentFactory?: (target: ExplorerTarget) => Promise<AiAgent>;
+  /** 上次运行录制的动作轨迹(按用例 id → 步序):命中则先回放,失败再 AI 自愈 */
+  traces?: SuiteTraces;
   onProgress?: (message: string) => void;
 }
+
+/** 一步的录制轨迹:action 文本用于校验用例未被改动 */
+export interface StepTrace {
+  action: string;
+  performed: unknown;
+}
+
+/** 整个用例集的轨迹:用例 id → 每步轨迹 */
+export type SuiteTraces = Record<string, StepTrace[]>;
 
 /**
  * 用例执行器:逐条用例、逐步执行(aiAction),带 expect 的步骤用 aiBoolean 判定通过/失败。
@@ -24,6 +35,9 @@ export interface CaseRunnerOptions {
  * Web/Android 通过 ExplorerTarget 统一驱动。
  */
 export class CaseRunner {
+  /** 本次运行录到的轨迹(仅记录通过的步骤),供调用方存盘给下次回放 */
+  readonly traces: SuiteTraces = {};
+
   constructor(
     private readonly target: ExplorerTarget,
     private readonly suite: TestCaseSuite,
@@ -82,7 +96,8 @@ export class CaseRunner {
     const steps: StepResult[] = [];
     let caseStatus: CaseResult['status'] = 'passed';
 
-    for (const step of testCase.steps) {
+    for (let stepIndex = 0; stepIndex < testCase.steps.length; stepIndex++) {
+      const step = testCase.steps[stepIndex]!;
       const screenshotFile = path.join('screenshots', `step-${String(nextShot()).padStart(3, '0')}.png`);
       const shotAbs = path.join(shotsDir, path.basename(screenshotFile));
 
@@ -106,10 +121,38 @@ export class CaseRunner {
         let status: StepResult['status'] = 'pass';
         let detail: string | undefined;
         if (agent.aiStep) {
-          // 支持合并式的 agent:执行 + 判定预期一次完成,省一次模型调用
-          const { ok } = await agent.aiStep(step.action, step.expect);
+          let ok: boolean | undefined;
+          let stepTrace: unknown;
+
+          // 有上次录制的轨迹且步骤文本未变 → 先按轨迹秒级回放,断言通过即免去 AI 找路
+          const cached = this.opts.traces?.[testCase.id]?.[stepIndex];
+          if (cached && cached.action === step.action && agent.replay && Array.isArray(cached.performed)) {
+            try {
+              await agent.replay(cached.performed);
+              const replayOk = step.expect ? await agent.aiBoolean(step.expect) : true;
+              if (replayOk) {
+                ok = true;
+                stepTrace = cached.performed;
+                detail = step.expect ? '断言通过(轨迹回放)' : '轨迹回放';
+              } else {
+                this.opts.onProgress?.('    ↻ 回放后断言未过,AI 重新执行');
+              }
+            } catch {
+              this.opts.onProgress?.('    ↻ 回放出错,AI 重新执行');
+            }
+          }
+
+          // 无轨迹/回放未达成 → AI 找路执行(合并式:执行 + 判定预期一次完成)
+          if (ok === undefined) {
+            const r = await agent.aiStep(step.action, step.expect);
+            ok = r.ok;
+            stepTrace = r.trace;
+            if (step.expect) detail = ok ? '断言通过' : `断言未满足:${step.expect}`;
+          }
           status = ok ? 'pass' : 'fail';
-          if (step.expect) detail = ok ? '断言通过' : `断言未满足:${step.expect}`;
+          if (ok && stepTrace !== undefined) {
+            (this.traces[testCase.id] ??= [])[stepIndex] = { action: step.action, performed: stepTrace };
+          }
         } else {
           await agent.aiAction(step.action);
           if (step.expect) {

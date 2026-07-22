@@ -9,9 +9,15 @@ export interface AiAgent {
   aiBoolean(question: string): Promise<boolean>;
   /**
    * 可选:一次完成「执行操作 + 判定预期」。
-   * 支持的 agent 能在确认目标达成的同一次模型调用里顺带判断 expect,省一次调用。
+   * 支持的 agent 能在确认目标达成的同一次模型调用里顺带判断 expect,省一次调用;
+   * trace 是本步实际执行的动作轨迹(对 agent 不透明的 JSON 值),可存下来供下次回放。
    */
-  aiStep?(instruction: string, expect?: string): Promise<{ ok: boolean }>;
+  aiStep?(instruction: string, expect?: string): Promise<{ ok: boolean; trace?: unknown }>;
+  /**
+   * 可选:按之前录制的轨迹直接回放(不叫模型,秒级)。
+   * 回放后是否真达成由调用方用 expect 断言判定,失败再降级回 aiStep 自愈。
+   */
+  replay?(trace: unknown): Promise<void>;
 }
 
 /** 探索目标当前位置(Web=URL/标题;Android=当前 Activity/包名) */

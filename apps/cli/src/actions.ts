@@ -18,6 +18,7 @@ import {
   renderHtmlReport,
   renderMarkdownReport,
   type Brain,
+  type SuiteTraces,
 } from '@testpilot/engine';
 import { loadSuite } from './load-suite.js';
 
@@ -216,12 +217,30 @@ export interface RunCasesOptions {
   out?: string;
 }
 
+/** 轨迹文件路径:cases.yaml → cases.trace.json(与用例文件同目录) */
+function traceFileOf(caseFile: string): string {
+  const resolved = path.resolve(caseFile);
+  const ext = path.extname(resolved);
+  return `${ext ? resolved.slice(0, -ext.length) : resolved}.trace.json`;
+}
+
 /** 执行用例文件(目标与平台在此提供,不依赖用例文件里是否绑定) */
 export async function runCases(opts: RunCasesOptions): Promise<void> {
   const loaded = await loadSuite(path.resolve(opts.file));
   const suite = { ...loaded, target: opts.target, platform: opts.platform };
   const outDir = newOutDir(opts.out);
   await mkdir(outDir, { recursive: true });
+
+  // 上次运行录制的动作轨迹:命中则秒级回放,省去 AI 找路(改过的步骤自动失效)
+  const traceFile = traceFileOf(opts.file);
+  let traces: SuiteTraces | undefined;
+  try {
+    const { readFile } = await import('node:fs/promises');
+    traces = JSON.parse(await readFile(traceFile, 'utf8')) as SuiteTraces;
+    console.log(`⚡ 发现上次运行轨迹,将优先回放:${traceFile}`);
+  } catch {
+    // 没有轨迹文件:首跑,全程 AI
+  }
 
   let target: ExplorerTarget;
   if (opts.platform === 'android') {
@@ -240,11 +259,25 @@ export async function runCases(opts: RunCasesOptions): Promise<void> {
           ? new AndroidCliAgent(t as AndroidExecutor)
           : new CliWebAgent(t as WebExecutor)
     : undefined;
-  const runner = new CaseRunner(target, suite, { outDir, agentFactory, onProgress: log });
+  const runner = new CaseRunner(target, suite, { outDir, agentFactory, traces, onProgress: log });
   console.log(`引擎:${useCli ? '本机 Claude CLI' : '多模态模型(midscene)'}`);
   console.log(`🧪 执行 ${suite.cases.length} 条用例 → ${opts.target}(${opts.platform})\n`);
   try {
     const report = await runner.run();
+
+    // 把本次通过步骤的轨迹合并存盘(按步覆盖),下次重跑可秒级回放
+    if (Object.keys(runner.traces).length > 0) {
+      const merged: SuiteTraces = { ...traces };
+      for (const [caseId, stepTraces] of Object.entries(runner.traces)) {
+        const list = [...(merged[caseId] ?? [])];
+        stepTraces.forEach((t, i) => {
+          if (t) list[i] = t;
+        });
+        merged[caseId] = list;
+      }
+      await writeFile(traceFile, JSON.stringify(merged, null, 2), 'utf8');
+      console.log(`⚡ 已保存运行轨迹 → ${traceFile}(下次重跑自动回放提速)`);
+    }
     const htmlPath = path.join(outDir, 'cases.html');
     await writeFile(htmlPath, renderCaseReport(report), 'utf8');
     await writeFile(path.join(outDir, 'cases.md'), renderCaseMarkdown(report), 'utf8');

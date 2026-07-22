@@ -23,6 +23,21 @@ interface ActionDecision {
   expect_ok?: boolean;
 }
 
+/** 已执行动作(可 JSON 序列化,存盘后供下次回放) */
+export type PerformedAction =
+  | { kind: 'tap'; x: number; y: number }
+  | { kind: 'input'; x: number; y: number; value: string }
+  | { kind: 'swipe'; direction: 'up' | 'down' | 'left' | 'right' }
+  | { kind: 'back' };
+
+/** 动作的一句可读描述(下一轮提示词回顾用) */
+function describePerformed(a: PerformedAction): string {
+  if (a.kind === 'back') return '返回上一屏';
+  if (a.kind === 'swipe') return `向${{ up: '上', down: '下', left: '左', right: '右' }[a.direction]}滑动`;
+  if (a.kind === 'input') return `点击 (${a.x},${a.y}) 并输入「${a.value}」`;
+  return `点击 (${a.x},${a.y})`;
+}
+
 function isDecision(p: Partial<ActionDecision>): p is ActionDecision {
   return (
     p.action === 'tap' ||
@@ -90,9 +105,10 @@ export class AndroidCliAgent implements AiAgent {
    * 一次完成「执行 + 判定预期」:模型输出 done 的同一次调用里顺带回答 expect 是否成立,
    * 比「执行完再单独 aiBoolean」省一次完整模型调用。
    */
-  async aiStep(instruction: string, expect?: string): Promise<{ ok: boolean }> {
+  async aiStep(instruction: string, expect?: string): Promise<{ ok: boolean; trace: PerformedAction[] }> {
     const { width, height } = await this.executor.screenSize();
     const history: string[] = [];
+    const trace: PerformedAction[] = [];
 
     const expectPart = expect
       ? `\n本步预期(达成目标后顺带判定):「${expect}」`
@@ -130,35 +146,52 @@ ${doneShape}
 
       for (const d of decisions) {
         if (d.action === 'done') {
-          return { ok: expect ? d.expect_ok === true : true };
+          return { ok: expect ? d.expect_ok === true : true, trace };
         }
-        history.push(await this.perform(d, instruction, width, height));
+        const performed = await this.perform(d, instruction, width, height);
+        trace.push(performed);
+        history.push(describePerformed(performed));
         if (this.settleMs > 0) await sleep(this.settleMs); // 等 UI 过渡/加载完
       }
     }
     // 预算用完:模型一直没说 done。有 expect 用一次独立判定兜底;没有则视为已尽力执行
-    return { ok: expect ? await this.aiBoolean(expect) : true };
+    return { ok: expect ? await this.aiBoolean(expect) : true, trace };
   }
 
-  /** 执行单个动作,返回一句可读描述(供下一轮提示词回顾) */
-  private async perform(d: ActionDecision, instruction: string, width: number, height: number): Promise<string> {
+  /**
+   * 按录制的轨迹直接回放(不叫模型):逐个执行动作,每个动作后等 UI 过渡。
+   * 是否真达成由调用方断言;失败调用方应降级回 aiStep 自愈。
+   */
+  async replay(trace: unknown): Promise<void> {
+    const actions = (Array.isArray(trace) ? trace : []) as PerformedAction[];
+    const { width, height } = await this.executor.screenSize();
+    for (const a of actions) {
+      if (a.kind === 'back') await this.executor.back();
+      else if (a.kind === 'swipe') await this.performSwipe(a.direction, width, height);
+      else if (a.kind === 'tap') await this.executor.tap(a.x, a.y);
+      else if (a.kind === 'input') {
+        await this.executor.tap(a.x, a.y);
+        await this.executor.typeText(a.value);
+      }
+      if (this.settleMs > 0) await sleep(this.settleMs);
+    }
+  }
+
+  /** 执行单个动作,返回结构化记录(供回放与下一轮提示词回顾) */
+  private async perform(
+    d: ActionDecision,
+    instruction: string,
+    width: number,
+    height: number,
+  ): Promise<PerformedAction> {
     if (d.action === 'back') {
       await this.executor.back();
-      return '返回上一屏';
+      return { kind: 'back' };
     }
     if (d.action === 'swipe') {
-      const cx = width / 2;
-      const cy = height / 2;
-      const dist = (d.direction === 'left' || d.direction === 'right' ? width : height) * 0.6;
-      const map = {
-        up: [cx, cy + dist / 2, cx, cy - dist / 2],
-        down: [cx, cy - dist / 2, cx, cy + dist / 2],
-        left: [cx + dist / 2, cy, cx - dist / 2, cy],
-        right: [cx - dist / 2, cy, cx + dist / 2, cy],
-      } as const;
-      const [x1, y1, x2, y2] = map[d.direction ?? 'up'];
-      await this.executor.swipe(x1, y1, x2, y2);
-      return `向${{ up: '上', down: '下', left: '左', right: '右' }[d.direction ?? 'up']}滑动`;
+      const direction = d.direction ?? 'up';
+      await this.performSwipe(direction, width, height);
+      return { kind: 'swipe', direction };
     }
     if (d.x === undefined || d.y === undefined) {
       throw new Error(`操作「${instruction}」:模型未给出有效坐标`);
@@ -166,9 +199,27 @@ ${doneShape}
     await this.executor.tap(d.x, d.y);
     if (d.action === 'input') {
       await this.executor.typeText(d.value ?? '');
-      return `点击 (${d.x},${d.y}) 并输入「${d.value ?? ''}」`;
+      return { kind: 'input', x: d.x, y: d.y, value: d.value ?? '' };
     }
-    return `点击 (${d.x},${d.y})`;
+    return { kind: 'tap', x: d.x, y: d.y };
+  }
+
+  private async performSwipe(
+    direction: 'up' | 'down' | 'left' | 'right',
+    width: number,
+    height: number,
+  ): Promise<void> {
+    const cx = width / 2;
+    const cy = height / 2;
+    const dist = (direction === 'left' || direction === 'right' ? width : height) * 0.6;
+    const map = {
+      up: [cx, cy + dist / 2, cx, cy - dist / 2],
+      down: [cx, cy - dist / 2, cx, cy + dist / 2],
+      left: [cx + dist / 2, cy, cx - dist / 2, cy],
+      right: [cx - dist / 2, cy, cx + dist / 2, cy],
+    } as const;
+    const [x1, y1, x2, y2] = map[direction];
+    await this.executor.swipe(x1, y1, x2, y2);
   }
 
   async aiBoolean(question: string): Promise<boolean> {

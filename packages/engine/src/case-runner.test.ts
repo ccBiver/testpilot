@@ -87,6 +87,108 @@ describe('CaseRunner', () => {
     expect(report.results[0]!.steps[0]!.detail).toContain('护栏');
   });
 
+  it('aiStep agent:记录通过步骤的轨迹到 runner.traces', async () => {
+    const dir = await outDir();
+    const agent: AiAgent = {
+      aiAction: async () => {},
+      aiBoolean: async () => true,
+      aiStep: async () => ({ ok: true, trace: [{ kind: 'tap', x: 1, y: 2 }] }),
+    };
+    const target = { ...fakeTarget(() => true), createAgent: async () => agent };
+    const runner = new CaseRunner(target, suite([
+      { id: 'c1', name: '录制', steps: [{ action: '点A' }, { action: '点B', expect: '到位' }] },
+    ]), { outDir: dir });
+    const report = await runner.run();
+    expect(report.passed).toBe(1);
+    expect(runner.traces['c1']).toHaveLength(2);
+    expect(runner.traces['c1']![0]).toEqual({ action: '点A', performed: [{ kind: 'tap', x: 1, y: 2 }] });
+  });
+
+  it('有轨迹且断言过 → 走 replay,不调 aiStep', async () => {
+    const dir = await outDir();
+    const called: string[] = [];
+    const agent: AiAgent = {
+      aiAction: async () => {},
+      aiBoolean: async () => {
+        called.push('aiBoolean');
+        return true;
+      },
+      aiStep: async () => {
+        called.push('aiStep');
+        return { ok: true, trace: [] };
+      },
+      replay: async () => {
+        called.push('replay');
+      },
+    };
+    const target = { ...fakeTarget(() => true), createAgent: async () => agent };
+    const runner = new CaseRunner(target, suite([
+      { id: 'c1', name: '回放', steps: [{ action: '点A', expect: '到位' }] },
+    ]), {
+      outDir: dir,
+      traces: { c1: [{ action: '点A', performed: [{ kind: 'tap', x: 1, y: 2 }] }] },
+    });
+    const report = await runner.run();
+    expect(report.passed).toBe(1);
+    expect(called).toEqual(['replay', 'aiBoolean']); // 没有 aiStep
+  });
+
+  it('回放后断言不过 → 自愈:降级 aiStep 重新执行并更新轨迹', async () => {
+    const dir = await outDir();
+    const called: string[] = [];
+    const agent: AiAgent = {
+      aiAction: async () => {},
+      aiBoolean: async () => {
+        called.push('aiBoolean');
+        return false; // 回放后断言失败
+      },
+      aiStep: async () => {
+        called.push('aiStep');
+        return { ok: true, trace: [{ kind: 'tap', x: 9, y: 9 }] };
+      },
+      replay: async () => {
+        called.push('replay');
+      },
+    };
+    const target = { ...fakeTarget(() => true), createAgent: async () => agent };
+    const runner = new CaseRunner(target, suite([
+      { id: 'c1', name: '自愈', steps: [{ action: '点A', expect: '到位' }] },
+    ]), {
+      outDir: dir,
+      traces: { c1: [{ action: '点A', performed: [{ kind: 'tap', x: 1, y: 2 }] }] },
+    });
+    const report = await runner.run();
+    expect(report.passed).toBe(1);
+    expect(called).toEqual(['replay', 'aiBoolean', 'aiStep']);
+    // 轨迹更新为新路径
+    expect(runner.traces['c1']![0]!.performed).toEqual([{ kind: 'tap', x: 9, y: 9 }]);
+  });
+
+  it('步骤文本改了 → 轨迹失效,直接 aiStep', async () => {
+    const dir = await outDir();
+    const called: string[] = [];
+    const agent: AiAgent = {
+      aiAction: async () => {},
+      aiBoolean: async () => true,
+      aiStep: async () => {
+        called.push('aiStep');
+        return { ok: true, trace: [] };
+      },
+      replay: async () => {
+        called.push('replay');
+      },
+    };
+    const target = { ...fakeTarget(() => true), createAgent: async () => agent };
+    const runner = new CaseRunner(target, suite([
+      { id: 'c1', name: '改文本', steps: [{ action: '点击新按钮' }] },
+    ]), {
+      outDir: dir,
+      traces: { c1: [{ action: '点击旧按钮', performed: [{ kind: 'tap', x: 1, y: 2 }] }] },
+    });
+    await runner.run();
+    expect(called).toEqual(['aiStep']); // 未回放
+  });
+
   it('汇总多用例 + 落盘 cases.json', async () => {
     const dir = await outDir();
     const runner = new CaseRunner(fakeTarget((q) => q === '通过'), suite([

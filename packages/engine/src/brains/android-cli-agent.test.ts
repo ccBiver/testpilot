@@ -109,20 +109,20 @@ describe('AndroidCliAgent(目标驱动循环,对 Flutter 有效)', () => {
       invokerOf('{"action":"tap","x":10,"y":20}', '{"action":"done","expect_ok":true,"reason":"已进入"}'),
       0,
     );
-    expect(await pass.aiStep('打开页面', '页面已打开')).toEqual({ ok: true });
+    expect((await pass.aiStep('打开页面', '页面已打开')).ok).toBe(true);
 
     const fail = new AndroidCliAgent(
       executor,
       invokerOf('{"action":"done","expect_ok":false,"reason":"没找到"}'),
       0,
     );
-    expect(await fail.aiStep('打开页面', '页面已打开')).toEqual({ ok: false });
+    expect((await fail.aiStep('打开页面', '页面已打开')).ok).toBe(false);
   });
 
   it('aiStep 无 expect:done 即 ok', async () => {
     const { executor } = fakeExecutor();
     const agent = new AndroidCliAgent(executor, invokerOf(DONE), 0);
-    expect(await agent.aiStep('随便看看')).toEqual({ ok: true });
+    expect((await agent.aiStep('随便看看')).ok).toBe(true);
   });
 
   it('aiStep 预算用完且有 expect → 落到独立 aiBoolean 兜底', async () => {
@@ -132,7 +132,7 @@ describe('AndroidCliAgent(目标驱动循环,对 Flutter 有效)', () => {
       ...Array.from({ length: 6 }, () => '{"action":"tap","x":1,"y":2}'),
       'no',
     ), 0);
-    expect(await agent.aiStep('永远达不成', '不可能的预期')).toEqual({ ok: false });
+    expect((await agent.aiStep('永远达不成', '不可能的预期')).ok).toBe(false);
   });
 
   it('打包里混入 done → 截断到 done,不执行其后的动作', async () => {
@@ -152,6 +152,37 @@ describe('AndroidCliAgent(目标驱动循环,对 Flutter 有效)', () => {
     const { executor } = fakeExecutor();
     const agent = new AndroidCliAgent(executor, invokerOf('{"action":"tap"}'), 0);
     await expect(agent.aiAction('点某处')).rejects.toThrow(/坐标/);
+  });
+
+  it('replay:按录制轨迹直接执行,不叫模型', async () => {
+    const { executor, calls } = fakeExecutor();
+    let invoked = 0;
+    const agent = new AndroidCliAgent(executor, async () => {
+      invoked++;
+      return DONE;
+    }, 0);
+    await agent.replay([
+      { kind: 'tap', x: 256, y: 1811 },
+      { kind: 'input', x: 300, y: 600, value: '60000' },
+      { kind: 'swipe', direction: 'up' },
+      { kind: 'back' },
+    ]);
+    expect(invoked).toBe(0); // 全程零模型调用
+    expect(calls[0]).toBe('tap:256,1811');
+    expect(calls).toContain('type:60000');
+    expect(calls).toContain('back');
+  });
+
+  it('aiStep 返回 trace:记录本步实际执行的动作', async () => {
+    const { executor } = fakeExecutor();
+    const agent = new AndroidCliAgent(
+      executor,
+      invokerOf('{"action":"tap","x":10,"y":20}', DONE),
+      0,
+    );
+    const r = await agent.aiStep('点某处');
+    expect(r.ok).toBe(true);
+    expect(r.trace).toEqual([{ kind: 'tap', x: 10, y: 20 }]);
   });
 
   it('aiBoolean 解析 yes/no', async () => {
