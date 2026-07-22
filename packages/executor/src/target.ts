@@ -7,6 +7,11 @@ export interface AiAgent {
   aiAction(instruction: string): Promise<unknown>;
   /** 判定断言真假(不抛异常,返回 true/false) */
   aiBoolean(question: string): Promise<boolean>;
+  /**
+   * 可选:一次完成「执行操作 + 判定预期」。
+   * 支持的 agent 能在确认目标达成的同一次模型调用里顺带判断 expect,省一次调用。
+   */
+  aiStep?(instruction: string, expect?: string): Promise<{ ok: boolean }>;
 }
 
 /** 探索目标当前位置(Web=URL/标题;Android=当前 Activity/包名) */

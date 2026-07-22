@@ -89,6 +89,10 @@ export class AndroidExecutor implements ExplorerTarget {
 
     this.currentPkg = target;
     this.startLogcat(deviceId);
+    if (!(await this.ensureAwake())) {
+      this.launchFailed = true;
+      throw new Error('设备处于锁屏状态(设有 PIN/指纹),截图会全黑,请先解锁手机再运行');
+    }
     try {
       await this.device.launch(target);
     } catch {
@@ -114,6 +118,8 @@ export class AndroidExecutor implements ExplorerTarget {
 
   async screenshot(filePath: string): Promise<void> {
     if (!this.device) return;
+    // 模型一轮思考可能超过屏幕自动息屏时间,截图前保活唤醒(尽力而为)
+    await this.ensureAwake().catch(() => {});
     const base64 = await this.device.screenshotBase64().catch(() => '');
     if (!base64) return;
     const data = base64.replace(/^data:image\/\w+;base64,/, '');
@@ -177,6 +183,27 @@ export class AndroidExecutor implements ExplorerTarget {
     await this.device?.destroy?.().catch(() => {});
     this.device = null;
     this._agent = null;
+  }
+
+  /**
+   * 保证屏幕点亮:息屏/锁屏时截图全黑,AI 什么都看不见。
+   * 无密码锁屏可自动解除;有 PIN/指纹的锁屏解不掉,返回 false 由调用方决定报错。
+   */
+  private async ensureAwake(): Promise<boolean> {
+    const power = await this.adbShell(['dumpsys', 'power']).catch(() => '');
+    const wakefulness = power.match(/mWakefulness=(\w+)/)?.[1];
+    if (wakefulness && wakefulness !== 'Awake') {
+      await this.adbShell(['input', 'keyevent', '224']).catch(() => {}); // KEYCODE_WAKEUP
+      await new Promise((r) => setTimeout(r, 800)); // 等亮屏动画
+    }
+    const win = await this.adbShell(['dumpsys', 'window']).catch(() => '');
+    if (/isKeyguardShowing=true/.test(win)) {
+      await this.adbShell(['wm', 'dismiss-keyguard']).catch(() => {});
+      await new Promise((r) => setTimeout(r, 800));
+      const after = await this.adbShell(['dumpsys', 'window']).catch(() => '');
+      return !/isKeyguardShowing=true/.test(after);
+    }
+    return true;
   }
 
   /** 通过 adb 读当前前台包名(dumpsys 兜底,失败返回空) */

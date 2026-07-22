@@ -103,13 +103,20 @@ export class CaseRunner {
       }
 
       try {
-        await agent.aiAction(step.action);
         let status: StepResult['status'] = 'pass';
         let detail: string | undefined;
-        if (step.expect) {
-          const ok = await agent.aiBoolean(step.expect);
+        if (agent.aiStep) {
+          // 支持合并式的 agent:执行 + 判定预期一次完成,省一次模型调用
+          const { ok } = await agent.aiStep(step.action, step.expect);
           status = ok ? 'pass' : 'fail';
-          detail = ok ? '断言通过' : `断言未满足:${step.expect}`;
+          if (step.expect) detail = ok ? '断言通过' : `断言未满足:${step.expect}`;
+        } else {
+          await agent.aiAction(step.action);
+          if (step.expect) {
+            const ok = await agent.aiBoolean(step.expect);
+            status = ok ? 'pass' : 'fail';
+            detail = ok ? '断言通过' : `断言未满足:${step.expect}`;
+          }
         }
         await this.target.screenshot(shotAbs).catch(() => {});
         steps.push({ action: step.action, expect: step.expect, status, detail, screenshotFile, at: Date.now() });

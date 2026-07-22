@@ -88,6 +88,66 @@ describe('AndroidCliAgent(目标驱动循环,对 Flutter 有效)', () => {
     expect(calls).toContain('back');
   });
 
+  it('同屏打包:一次输出多个动作按序执行(填表单场景)', async () => {
+    const { executor, calls } = fakeExecutor();
+    const agent = new AndroidCliAgent(
+      executor,
+      invokerOf(
+        '{"actions":[{"action":"input","x":300,"y":600,"value":"100"},{"action":"input","x":300,"y":800,"value":"120"}]}',
+        DONE,
+      ),
+      0,
+    );
+    await agent.aiAction('填写开仓价 100 和平仓价 120');
+    expect(calls).toEqual(['tap:300,600', 'type:100', 'tap:300,800', 'type:120']);
+  });
+
+  it('aiStep:done 同时带 expect_ok,一次调用完成执行+断言', async () => {
+    const { executor } = fakeExecutor();
+    const pass = new AndroidCliAgent(
+      executor,
+      invokerOf('{"action":"tap","x":10,"y":20}', '{"action":"done","expect_ok":true,"reason":"已进入"}'),
+      0,
+    );
+    expect(await pass.aiStep('打开页面', '页面已打开')).toEqual({ ok: true });
+
+    const fail = new AndroidCliAgent(
+      executor,
+      invokerOf('{"action":"done","expect_ok":false,"reason":"没找到"}'),
+      0,
+    );
+    expect(await fail.aiStep('打开页面', '页面已打开')).toEqual({ ok: false });
+  });
+
+  it('aiStep 无 expect:done 即 ok', async () => {
+    const { executor } = fakeExecutor();
+    const agent = new AndroidCliAgent(executor, invokerOf(DONE), 0);
+    expect(await agent.aiStep('随便看看')).toEqual({ ok: true });
+  });
+
+  it('aiStep 预算用完且有 expect → 落到独立 aiBoolean 兜底', async () => {
+    const { executor } = fakeExecutor();
+    // 前 6 轮都给 tap(耗尽预算),兜底的 aiBoolean 收到最后一个输出 no
+    const agent = new AndroidCliAgent(executor, invokerOf(
+      ...Array.from({ length: 6 }, () => '{"action":"tap","x":1,"y":2}'),
+      'no',
+    ), 0);
+    expect(await agent.aiStep('永远达不成', '不可能的预期')).toEqual({ ok: false });
+  });
+
+  it('打包里混入 done → 截断到 done,不执行其后的动作', async () => {
+    const { executor, calls } = fakeExecutor();
+    const agent = new AndroidCliAgent(
+      executor,
+      invokerOf(
+        '{"actions":[{"action":"tap","x":1,"y":2},{"action":"done"},{"action":"tap","x":9,"y":9}]}',
+      ),
+      0,
+    );
+    await agent.aiAction('目标');
+    expect(calls).toEqual(['tap:1,2']);
+  });
+
   it('tap 缺坐标 → 抛错', async () => {
     const { executor } = fakeExecutor();
     const agent = new AndroidCliAgent(executor, invokerOf('{"action":"tap"}'), 0);

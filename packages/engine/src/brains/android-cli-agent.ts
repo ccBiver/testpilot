@@ -19,24 +19,39 @@ interface ActionDecision {
   direction?: 'up' | 'down' | 'left' | 'right';
   /** done 时:目标达成的一句说明(可选) */
   reason?: string;
+  /** done 时:若提示词里带了 expect,顺带判定其真假 */
+  expect_ok?: boolean;
 }
 
-export function parseActionDecision(raw: string): ActionDecision | null {
+function isDecision(p: Partial<ActionDecision>): p is ActionDecision {
+  return (
+    p.action === 'tap' ||
+    p.action === 'input' ||
+    p.action === 'back' ||
+    p.action === 'swipe' ||
+    p.action === 'done'
+  );
+}
+
+/**
+ * 解析模型输出为动作序列:单个 {"action":...} 或同屏打包 {"actions":[...]}。
+ * done 只允许单独出现(打包里出现则截断到 done 之前)。
+ */
+export function parseActionDecision(raw: string): ActionDecision[] | null {
   const start = raw.indexOf('{');
   if (start === -1) return null;
   for (let end = raw.lastIndexOf('}'); end > start; end = raw.lastIndexOf('}', end - 1)) {
     try {
-      const p = JSON.parse(raw.slice(start, end + 1)) as Partial<ActionDecision>;
-      if (
-        p.action === 'tap' ||
-        p.action === 'input' ||
-        p.action === 'back' ||
-        p.action === 'swipe' ||
-        p.action === 'done'
-      ) {
-        return p as ActionDecision;
+      const p = JSON.parse(raw.slice(start, end + 1)) as
+        | Partial<ActionDecision>
+        | { actions?: Partial<ActionDecision>[] };
+      if ('actions' in p && Array.isArray(p.actions)) {
+        const list = p.actions.filter(isDecision);
+        if (list.length === 0) return null;
+        const doneAt = list.findIndex((d) => d.action === 'done');
+        return doneAt === -1 ? list : list.slice(0, doneAt + 1);
       }
-      return null;
+      return isDecision(p as Partial<ActionDecision>) ? [p as ActionDecision] : null;
     } catch {
       // 缩小右边界重试
     }
@@ -64,39 +79,65 @@ export class AndroidCliAgent implements AiAgent {
   /**
    * 执行一步用例:目标驱动的小循环。
    * 用例里的一步(如「打开合约计算器入口」)在真机上可能要点好几下(进合约页→更多→计算器),
-   * 所以每轮看一次屏幕、做一个动作,直到模型确认目标达成(done)或用完预算。
-   * 预算用完不抛错——是否真达成交给该步的 expect 断言判定。
+   * 所以每轮看一次屏幕,模型给「一个动作」或「同屏可见目标的一串动作」,执行后再看,
+   * 直到模型确认目标达成(done)或用完预算。预算用完不抛错——交给 expect 断言判定。
    */
   async aiAction(instruction: string): Promise<void> {
+    await this.aiStep(instruction);
+  }
+
+  /**
+   * 一次完成「执行 + 判定预期」:模型输出 done 的同一次调用里顺带回答 expect 是否成立,
+   * 比「执行完再单独 aiBoolean」省一次完整模型调用。
+   */
+  async aiStep(instruction: string, expect?: string): Promise<{ ok: boolean }> {
     const { width, height } = await this.executor.screenSize();
-    const done: string[] = [];
+    const history: string[] = [];
+
+    const expectPart = expect
+      ? `\n本步预期(达成目标后顺带判定):「${expect}」`
+      : '';
+    const doneShape = expect
+      ? '{"action":"done","expect_ok":true|false,"reason":"一句话说明"}   目标已达成,并判定预期是否成立'
+      : '{"action":"done","reason":"一句话说明"}                     当前屏幕表明目标已达成,本步结束';
 
     for (let round = 1; round <= MAX_ACTIONS_PER_STEP; round++) {
       const shot = await this.snap();
-      const historyPart = done.length ? `\n本步已执行的动作:\n${done.map((a, i) => `${i + 1}. ${a}`).join('\n')}` : '';
+      const historyPart = history.length
+        ? `\n本步已执行的动作:\n${history.map((a, i) => `${i + 1}. ${a}`).join('\n')}`
+        : '';
 
       const prompt = `你在操作一个 Android 应用,屏幕分辨率 ${width}×${height} 像素(左上角为原点)。
 先用 Read 工具查看当前屏幕截图:${shot}
-本步目标:「${instruction}」${historyPart}
+本步目标:「${instruction}」${expectPart}${historyPart}
 
 达成目标可能需要连续多个动作(例如先进入某页、再打开某菜单、再点某项)。
-每次只输出下一个动作,一个 JSON(不要 markdown、不要解释):
+输出 JSON(不要 markdown、不要解释),动作类型:
 {"action":"tap","x":像素X,"y":像素Y}                      点击某处
 {"action":"input","x":像素X,"y":像素Y,"value":"要输入的文本"}  点击输入框后输入
 {"action":"swipe","direction":"up|down|left|right"}         滑动屏幕(找不到目标时可先滑动找)
 {"action":"back"}                                          返回上一屏
-{"action":"done","reason":"一句话说明"}                     当前屏幕表明目标已达成,本步结束
+${doneShape}
+
+若接下来的几个动作,目标控件在当前截图里【已经全部可见】且互不影响
+(典型:同一表单里连续填多个输入框),可打包一次输出:{"actions":[{...},{...}]}。
+点击后界面会变化的(导航、开菜单、弹窗)绝不可打包,必须单个输出、看了新截图再定下一步。
 坐标要落在目标控件中心,取值范围 x∈[0,${width}] y∈[0,${height}]。
 第 ${round}/${MAX_ACTIONS_PER_STEP} 轮;若目标已达成务必输出 done,不要多余操作。`;
 
-      const d = parseActionDecision(await this.invoke(prompt));
-      if (!d) throw new Error(`无法把操作「${instruction}」映射为 Android 动作`);
-      if (d.action === 'done') return;
+      const decisions = parseActionDecision(await this.invoke(prompt));
+      if (!decisions) throw new Error(`无法把操作「${instruction}」映射为 Android 动作`);
 
-      done.push(await this.perform(d, instruction, width, height));
-      if (this.settleMs > 0) await sleep(this.settleMs); // 等 UI 过渡/加载完,再截下一帧
+      for (const d of decisions) {
+        if (d.action === 'done') {
+          return { ok: expect ? d.expect_ok === true : true };
+        }
+        history.push(await this.perform(d, instruction, width, height));
+        if (this.settleMs > 0) await sleep(this.settleMs); // 等 UI 过渡/加载完
+      }
     }
-    // 预算用完:不判失败,让 expect 断言决定这步是否通过
+    // 预算用完:模型一直没说 done。有 expect 用一次独立判定兜底;没有则视为已尽力执行
+    return { ok: expect ? await this.aiBoolean(expect) : true };
   }
 
   /** 执行单个动作,返回一句可读描述(供下一轮提示词回顾) */

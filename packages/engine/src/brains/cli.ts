@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { checkGuardrail, type Interactable, type WebExecutor } from '@testpilot/executor';
 import type { Brain, BrainContext, StepPlan } from './types.js';
@@ -86,26 +86,134 @@ export function parseCliEnvelope(stdout: string): { text: string; sessionId?: st
   return { text: stdout };
 }
 
+/** 常驻 claude 子进程:stream-json 双向管道,一个实例一场对话 */
+class ClaudeStreamProcess {
+  private child: ReturnType<typeof spawn> | null = null;
+  private buffer = '';
+  private waiter: { resolve: (v: string) => void; reject: (e: Error) => void } | null = null;
+
+  /** 发送一条用户消息,等待 result 事件 */
+  ask(prompt: string): Promise<string> {
+    if (!this.child) this.spawnChild();
+    const child = this.child!;
+    return new Promise<string>((resolve, reject) => {
+      if (this.waiter) {
+        reject(new Error('上一次调用尚未完成(内部串行约束被破坏)'));
+        return;
+      }
+      const timer = setTimeout(() => {
+        this.fail(new Error(`超时(>${STEP_TIMEOUT_MS / 1000}s)`));
+      }, STEP_TIMEOUT_MS);
+      this.waiter = {
+        resolve: (v) => {
+          clearTimeout(timer);
+          this.waiter = null;
+          resolve(v);
+        },
+        reject: (e) => {
+          clearTimeout(timer);
+          this.waiter = null;
+          reject(e);
+        },
+      };
+      child.stdin?.write(
+        `${JSON.stringify({ type: 'user', message: { role: 'user', content: prompt } })}\n`,
+      );
+    });
+  }
+
+  /** 结束子进程(失败重建或收尾) */
+  kill(): void {
+    this.child?.kill();
+    this.child = null;
+    this.buffer = '';
+  }
+
+  private spawnChild(): void {
+    const child = spawn(
+      'claude',
+      [
+        '-p',
+        '--input-format',
+        'stream-json',
+        '--output-format',
+        'stream-json',
+        '--verbose',
+        '--allowedTools',
+        'Read',
+        '--model',
+        CLI_MODEL,
+        // 决策不需要用户的 MCP 服务器 / rules / CLAUDE.md;隔离掉可省下数万 token 的冷启动上下文
+        '--strict-mcp-config',
+        '--mcp-config',
+        '{"mcpServers":{}}',
+        '--setting-sources',
+        '',
+      ],
+      { cwd: tmpdir() },
+    );
+    this.child = child;
+    child.stdout?.on('data', (d: Buffer) => this.onData(d));
+    child.on('error', (err) => {
+      const hint = /ENOENT/.test(String(err))
+        ? '未找到 claude 命令,请确认本机已安装 Claude Code CLI'
+        : err.message;
+      this.fail(new Error(hint));
+    });
+    child.on('exit', (code) => {
+      if (this.child === child) this.child = null;
+      this.fail(new Error(`claude 进程退出(code=${code ?? '?'})`));
+    });
+    // 主进程退出时不留孤儿
+    process.once('exit', () => child.kill());
+  }
+
+  private onData(d: Buffer): void {
+    this.buffer += d.toString();
+    const lines = this.buffer.split('\n');
+    this.buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      let ev: { type?: unknown; result?: unknown; is_error?: unknown };
+      try {
+        ev = JSON.parse(line) as typeof ev;
+      } catch {
+        continue; // 忽略非 JSON 行
+      }
+      if (ev.type !== 'result') continue; // assistant/system 等中间事件跳过
+      if (ev.is_error === true) {
+        this.fail(new Error(`模型返回错误:${String(ev.result ?? '').slice(0, 200)}`));
+      } else {
+        this.waiter?.resolve(typeof ev.result === 'string' ? ev.result : '');
+      }
+    }
+  }
+
+  /** 出错:叫醒等待者并废弃进程(下次调用重建) */
+  private fail(err: Error): void {
+    this.kill();
+    this.waiter?.reject(err);
+  }
+}
+
 /**
- * 会话式决策器:同一实例的多次调用续用同一个 claude 会话。
- * 好处:①系统提示词/历史命中提示词缓存,成本约降一个数量级;
- * ②模型记得之前每一步做了什么,决策更连贯。
- * 失败重试时放弃旧会话换新会话,避免坏会话卡死。
+ * 会话式决策器:一个实例对应一个常驻 claude 子进程(stream-json 双向流)。
+ * 好处:①免去每步 5~8s 的进程冷启动/会话恢复;②系统提示词/历史命中缓存;
+ * ③模型记得之前每一步做了什么,决策更连贯。
+ * 失败自动重建进程重试(全新对话),避免坏进程卡死。
  */
 export function createClaudeSession(): CliInvoker {
-  let sessionId: string | undefined;
+  const proc = new ClaudeStreamProcess();
   return async (prompt) => {
     let lastErr: unknown;
     for (let attempt = 0; attempt <= CLI_MAX_RETRIES; attempt++) {
       try {
-        const { text, sessionId: sid } = await invokeOnce(prompt, sessionId);
-        if (sid) sessionId = sid;
-        return text;
+        return await proc.ask(prompt);
       } catch (err) {
         lastErr = err;
-        // ENOENT(没装 claude)不必重试;其余失败换全新会话再试
+        // ENOENT(没装 claude)不必重试;其余失败重建进程再试
         if (err instanceof Error && err.message.includes('未找到 claude 命令')) break;
-        sessionId = undefined;
+        proc.kill();
       }
     }
     const msg = lastErr instanceof Error ? lastErr.message : String(lastErr);
