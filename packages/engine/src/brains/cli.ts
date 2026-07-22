@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { tmpdir } from 'node:os';
 import { checkGuardrail, type Interactable, type WebExecutor } from '@testpilot/executor';
 import type { Brain, BrainContext, StepPlan } from './types.js';
 
@@ -15,13 +16,33 @@ export interface CliDecision {
 const STEP_TIMEOUT_MS = 180_000; // 看图+推理比纯文本慢,给足时间避免误判超时
 const CLI_MAX_RETRIES = 2; // claude 偶发非零退出(冷启动/瞬时故障)时重试,避免一次抖动就判失败
 
+/**
+ * 模型:sonnet 视觉定位准确且比默认(opus 级)便宜约 8 倍;实测 haiku 给坐标会偏,不可用。
+ * 可用 TESTPILOT_CLAUDE_MODEL 覆盖。
+ */
+const CLI_MODEL = process.env.TESTPILOT_CLAUDE_MODEL ?? 'sonnet';
+
 /** 单次调用本机 claude CLI 无头模式,允许 Read 工具查看截图 */
 function invokeOnce(prompt: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = execFile(
       'claude',
-      ['-p', prompt, '--allowedTools', 'Read'],
-      { timeout: STEP_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024 },
+      [
+        '-p',
+        prompt,
+        '--allowedTools',
+        'Read',
+        '--model',
+        CLI_MODEL,
+        // 决策不需要用户的 MCP 服务器 / rules / CLAUDE.md;隔离掉可省下数万 token 的冷启动上下文
+        '--strict-mcp-config',
+        '--mcp-config',
+        '{"mcpServers":{}}',
+        '--setting-sources',
+        '',
+      ],
+      // cwd 指到临时目录,避免把当前项目的 CLAUDE.md/记忆装进上下文
+      { timeout: STEP_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024, cwd: tmpdir() },
       (err, stdout, stderr) => {
         if (err) {
           if (/ENOENT/.test(String(err))) {
