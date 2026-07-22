@@ -2,7 +2,7 @@ import { mkdtemp } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { AiAgent, AndroidExecutor } from '@testpilot/executor';
-import { claudeInvoker, type CliInvoker } from './cli.js';
+import { createClaudeSession, type CliInvoker } from './cli.js';
 
 interface ActionDecision {
   action: 'tap' | 'input' | 'back' | 'swipe';
@@ -41,7 +41,8 @@ export class AndroidCliAgent implements AiAgent {
 
   constructor(
     private readonly executor: AndroidExecutor,
-    private readonly invoke: CliInvoker = claudeInvoker,
+    // 每个 agent 实例一个 claude 会话:多步共享上下文、命中提示词缓存
+    private readonly invoke: CliInvoker = createClaudeSession(),
   ) {}
 
   async aiAction(instruction: string): Promise<void> {

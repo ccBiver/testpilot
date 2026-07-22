@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Observation, WebExecutor } from '@testpilot/executor';
-import { CliBrain, parseDecision, type CliInvoker } from './cli.js';
+import { CliBrain, parseCliEnvelope, parseDecision, type CliInvoker } from './cli.js';
 
 const CTX = { stepSeq: 2, stepBudget: 10, goal: '测试注册流程', lastScreenshot: '/tmp/s.png' };
 
@@ -41,6 +41,28 @@ describe('parseDecision', () => {
     expect(parseDecision('我不知道该做什么')).toBeNull();
     expect(parseDecision('{"action":"dance","description":"x"}')).toBeNull();
     expect(parseDecision('{broken json')).toBeNull();
+  });
+});
+
+describe('parseCliEnvelope', () => {
+  it('解析 json 信封,取 result 与 session_id', () => {
+    const out = parseCliEnvelope(
+      '{"type":"result","is_error":false,"result":"{\\"action\\":\\"tap\\"}","session_id":"abc-123"}',
+    );
+    expect(out.text).toBe('{"action":"tap"}');
+    expect(out.sessionId).toBe('abc-123');
+  });
+
+  it('is_error=true → 抛错并带模型信息', () => {
+    expect(() => parseCliEnvelope('{"result":"配额已用尽","is_error":true}')).toThrow(/配额已用尽/);
+  });
+
+  it('非 JSON(旧版纯文本)→ 原样返回,无 session', () => {
+    const out = parseCliEnvelope('{"action":"tap","x":1,"y":2}\n');
+    // 能被 JSON.parse 但没有 result 字段 → 走兜底原样返回
+    expect(out.text).toContain('"action":"tap"');
+    expect(out.sessionId).toBeUndefined();
+    expect(parseCliEnvelope('纯文本输出').text).toBe('纯文本输出');
   });
 });
 

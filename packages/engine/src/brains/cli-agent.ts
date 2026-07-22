@@ -2,7 +2,7 @@ import { mkdtemp } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import type { AiAgent, WebExecutor } from '@testpilot/executor';
-import { claudeInvoker, type CliInvoker } from './cli.js';
+import { createClaudeSession, type CliInvoker } from './cli.js';
 
 interface ActionDecision {
   action: 'open_link' | 'click_button' | 'fill_input';
@@ -41,7 +41,8 @@ export class CliWebAgent implements AiAgent {
 
   constructor(
     private readonly executor: WebExecutor,
-    private readonly invoke: CliInvoker = claudeInvoker,
+    // 每个 agent 实例一个 claude 会话:多步共享上下文、命中提示词缓存
+    private readonly invoke: CliInvoker = createClaudeSession(),
   ) {}
 
   /** 执行一步自然语言操作:观察元素 + 截图 → claude 选元素/动作 → 执行 */
